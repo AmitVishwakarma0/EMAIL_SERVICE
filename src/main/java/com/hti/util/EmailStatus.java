@@ -1,0 +1,6 @@
+package com.hti.util;
+
+public enum EmailStatus {
+	DELIVERED, REJECTED, PENDING, FAILED, TEMP_FAILURE, BLOCKED, AUTH_ERROR, UNKNOWN, ERROR
+
+}

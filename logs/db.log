@@ -1,0 +1,57 @@
+2025-12-02 10:35:27:648 [pool-2-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:35:27:656 [pool-2-thread-1] - Tables: 1
+2025-12-02 10:35:27:659 [pool-2-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:36:19:400 [pool-3-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:36:19:407 [pool-3-thread-1] - Tables: 1
+2025-12-02 10:36:19:409 [pool-3-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:36:34:844 [pool-2-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:36:34:855 [pool-2-thread-1] - Tables: 1
+2025-12-02 10:36:34:856 [pool-2-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:40:41:722 [pool-3-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:40:41:725 [pool-3-thread-1] - Tables: 1
+2025-12-02 10:40:41:731 [pool-3-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:41:03:097 [pool-4-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:41:03:102 [pool-4-thread-1] - Tables: 1
+2025-12-02 10:41:03:106 [pool-4-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:41:09:121 [pool-5-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:41:09:124 [pool-5-thread-1] - Tables: 1
+2025-12-02 10:41:09:125 [pool-5-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:41:58:984 [pool-6-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:41:58:986 [pool-6-thread-1] - Tables: 1
+2025-12-02 10:41:58:988 [pool-6-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:42:52:803 [pool-7-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:42:52:806 [pool-7-thread-1] - Tables: 1
+2025-12-02 10:42:52:807 [pool-7-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:43:23:207 [pool-8-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:43:23:211 [pool-8-thread-1] - Tables: 1
+2025-12-02 10:43:23:212 [pool-8-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:43:30:139 [pool-9-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:43:30:143 [pool-9-thread-1] - Tables: 1
+2025-12-02 10:43:30:144 [pool-9-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:43:57:403 [pool-10-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:43:57:405 [pool-10-thread-1] - Tables: 1
+2025-12-02 10:43:57:406 [pool-10-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:44:05:307 [pool-11-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:44:05:309 [pool-11-thread-1] - Tables: 1
+2025-12-02 10:44:05:310 [pool-11-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:44:14:224 [pool-12-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:44:14:226 [pool-12-thread-1] - Tables: 1
+2025-12-02 10:44:14:228 [pool-12-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:44:20:107 [pool-13-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:44:20:109 [pool-13-thread-1] - Tables: 1
+2025-12-02 10:44:20:110 [pool-13-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:44:34:167 [pool-14-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:44:34:169 [pool-14-thread-1] - Tables: 1
+2025-12-02 10:44:34:169 [pool-14-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:44:49:236 [pool-15-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:44:49:239 [pool-15-thread-1] - Tables: 1
+2025-12-02 10:44:49:240 [pool-15-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:45:40:070 [pool-16-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:45:40:073 [pool-16-thread-1] - Tables: 1
+2025-12-02 10:45:40:074 [pool-16-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:45:59:194 [pool-2-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:45:59:203 [pool-2-thread-1] - Tables: 1
+2025-12-02 10:45:59:203 [pool-2-thread-1] - ACTIVE entries collected: 0
+2025-12-02 10:49:10:542 [pool-2-thread-1] -  SQL: SHOW TABLES LIKE 'batch_%'
+2025-12-02 10:49:10:550 [pool-2-thread-1] - Tables: 1
+2025-12-02 10:49:10:551 [pool-2-thread-1] - ACTIVE entries collected: 0
