@@ -33,6 +33,7 @@ import com.hti.model.EmailProcessResponse;
 import com.hti.model.EmailRequest;
 import com.hti.model.EmailScheduleResponse;
 import com.hti.model.ScheduleEmailRequest;
+import com.hti.model.ScheduleFilterRequest;
 import com.hti.service.BatchService;
 import com.hti.service.ScheduleService;
 
@@ -204,10 +205,10 @@ public class ScheduleController {
 			@ApiResponse(responseCode = "200", description = "Scheduled batches retrieved successfully.", content = @Content(mediaType = "application/json")),
 			@ApiResponse(responseCode = "400", description = "Invalid parameters or missing headers.", content = @Content(mediaType = "application/json", schema = @Schema())),
 			@ApiResponse(responseCode = "500", description = "Internal server error.", content = @Content(mediaType = "application/json", schema = @Schema())) })
-	public ResponseEntity<?> getAllBulk(@Valid @ModelAttribute BatchProcessFilterRequest batchProcessFilterRequest,
+	public ResponseEntity<?> getAllBulk(@Valid @ModelAttribute ScheduleFilterRequest filterRequest,
 			@Parameter(description = "Authenticated username or requester", example = "testUser", required = true) @RequestHeader String username,
 			@Parameter(description = "Client IP address making the request", example = "127.0.0.1", required = true) @RequestHeader @NotBlank(message = "IP address header is required") String ipAddress) {
-		List<EmailScheduleResponse> list = batchService.getAllScheduledBatches(username, ipAddress, batchProcessFilterRequest);
+		List<EmailScheduleResponse> list = batchService.getAllScheduledBatches(username, ipAddress, filterRequest);
 		System.out.println("Returning list size: " + list.size());
 		return ResponseEntity.ok(list);
 	}

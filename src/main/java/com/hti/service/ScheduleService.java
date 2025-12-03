@@ -5,6 +5,7 @@ import java.util.List;
 import com.hti.model.BatchProcessFilterRequest;
 import com.hti.model.EmailScheduleResponse;
 import com.hti.model.ScheduleEmailRequest;
+import com.hti.model.ScheduleFilterRequest;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -21,7 +22,6 @@ public interface ScheduleService {
 
 	public void updateSchedule(@Valid ScheduleEmailRequest emailRequest, String username, String ipAddress);
 
-	public List<EmailScheduleResponse> getAllScheduledBatches(String username,
-			@NotBlank(message = "IP address header is required") String ipAddress,
-			@Valid BatchProcessFilterRequest batchProcessFilterRequest);
+	public List<EmailScheduleResponse> getAllScheduledBatches(String username, String ipAddress,
+			@Valid ScheduleFilterRequest filterRequest);
 }

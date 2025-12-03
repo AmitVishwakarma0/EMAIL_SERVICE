@@ -19,6 +19,7 @@ import com.hazelcast.internal.json.JsonArray;
 import com.hti.database.service.DBService;
 import com.hti.entity.EmailEntry;
 import com.hti.entity.EmailEntry.BatchStatus;
+import com.hti.entity.EmailEntry.BatchType;
 import com.hti.entity.RecipientsEntry;
 import com.hti.exception.InvalidRequestException;
 import com.hti.exception.ProcessingException;
@@ -71,7 +72,7 @@ public class BatchServiceImpl implements BatchService {
 			}
 		}
 		if (entry != null) {
-			EmailProcessResponse response = prepareResponse(entry);
+			EmailProcessResponse response = prepareResponse(entry, true);
 			response.setPendingCounter(pendingCounter);
 			return response;
 		}
@@ -165,13 +166,13 @@ public class BatchServiceImpl implements BatchService {
 			if (inner != null && inner.containsKey(entry.getBatchId())) {
 				EmailProcessor processor = inner.get(entry.getBatchId());
 				EmailEntry runningEntry = processor.getEntry();
-				EmailProcessResponse response = prepareResponse(runningEntry);
+				EmailProcessResponse response = prepareResponse(runningEntry, false);
 				response.setPendingCounter(runningEntry.getPendingRecipientList().size());
 				responseList.add(response);
 				continue;
 			}
 			int pendingCounter = dbService.countPendingRecipients(systemId, entry.getBatchId());
-			EmailProcessResponse response = prepareResponse(entry);
+			EmailProcessResponse response = prepareResponse(entry, false);
 			response.setPendingCounter(pendingCounter);
 			responseList.add(response);
 		}
@@ -183,7 +184,7 @@ public class BatchServiceImpl implements BatchService {
 		String batchId = request.getBatchId();
 		logger.info(systemId + "[" + batchId + "]: Preparing EmailEntry.");
 		EmailEntry entry = new EmailEntry(batchId, systemId, ipAddress, new Timestamp(System.currentTimeMillis()),
-				BatchStatus.ACTIVE);
+				BatchStatus.ACTIVE, BatchType.IMMEDIATE);
 		BeanUtils.copyProperties(request, entry);
 		JsonArray json = new JsonArray();
 		if (attachmentList != null) {
@@ -264,34 +265,35 @@ public class BatchServiceImpl implements BatchService {
 		return list;
 	}
 
-	private EmailProcessResponse prepareResponse(EmailEntry entry) {
+	private EmailProcessResponse prepareResponse(EmailEntry entry, boolean attachment) {
 		EmailProcessResponse response = new EmailProcessResponse();
 		BeanUtils.copyProperties(entry, response);
 		response.setStatus(entry.getBatchStatus().toString());
-		List<MultipartFile> attachmentList = new ArrayList<MultipartFile>();
-		if (entry.getAttachments() != null && !entry.getAttachments().isEmpty()) {
-			JSONArray attachmentArray = new JSONArray(entry.getAttachments());
-			String attachmentDir = GlobalVar.ATTACHMENT_DIR + File.separator + entry.getSystemId().toLowerCase()
-					+ File.separator + entry.getBatchId();
-			for (int i = 0; i < attachmentArray.length(); i++) {
-				String filename = attachmentArray.getString(i).trim();
-				File file = new File(attachmentDir, filename);
-				if (file.exists()) {
-					try {
-						MultipartFile multipartFile = new DiskMultipartFile(file);
-						attachmentList.add(multipartFile);
-						logger.info(entry.getBatchId() + ": " + filename + " found as attachment.");
-					} catch (IOException e) {
-						logger.error(entry.getBatchId() + " " + filename, e);
+		if (attachment) {
+			List<MultipartFile> attachmentList = new ArrayList<MultipartFile>();
+			if (entry.getAttachments() != null && !entry.getAttachments().isEmpty()) {
+				JSONArray attachmentArray = new JSONArray(entry.getAttachments());
+				String attachmentDir = GlobalVar.ATTACHMENT_DIR + File.separator + entry.getSystemId().toLowerCase()
+						+ File.separator + entry.getBatchId();
+				for (int i = 0; i < attachmentArray.length(); i++) {
+					String filename = attachmentArray.getString(i).trim();
+					File file = new File(attachmentDir, filename);
+					if (file.exists()) {
+						try {
+							MultipartFile multipartFile = new DiskMultipartFile(file);
+							attachmentList.add(multipartFile);
+							logger.info(entry.getBatchId() + ": " + filename + " found as attachment.");
+						} catch (IOException e) {
+							logger.error(entry.getBatchId() + " " + filename, e);
+						}
+					} else {
+						logger.warn(entry.getBatchId() + ": " + filename + " does not exist in attachment directory.");
 					}
-				} else {
-					logger.warn(entry.getBatchId() + ": " + filename + " does not exist in attachment directory.");
 				}
 			}
+			response.setAttachmentList(attachmentList);
 		}
 		return response;
 	}
-
-
 
 }

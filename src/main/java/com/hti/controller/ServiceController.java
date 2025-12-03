@@ -29,6 +29,7 @@ import com.hti.entity.RecipientsEntry;
 import com.hti.exception.InvalidRequestException;
 import com.hti.listener.FlagEventListener;
 import com.hti.process.EmailProcessor;
+import com.hti.process.SchedulerManager;
 import com.hti.util.FileUtil;
 import com.hti.util.GlobalVar;
 
@@ -207,6 +208,7 @@ public class ServiceController implements Runnable {
 			logger.error(entry.getSystemId() + "[" + entry.getBatchId() + "]", e.getMessage());
 		}
 	}
+	
 
 	private void stopProcess() {
 		// TODO Auto-generated method stub

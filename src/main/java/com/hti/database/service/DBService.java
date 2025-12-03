@@ -4,11 +4,15 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -21,9 +25,12 @@ import org.slf4j.LoggerFactory;
 
 import com.hti.entity.EmailEntry;
 import com.hti.entity.RecipientsEntry;
+import com.hti.entity.ScheduleEntry;
 import com.hti.entity.SmtpEntry;
 import com.hti.model.BatchProcessFilterRequest;
 import com.hti.model.EmailProcessResponse;
+import com.hti.model.ScheduleFilterRequest;
+import com.hti.util.EmailStatus;
 import com.hti.util.GlobalVar;
 
 public class DBService {
@@ -64,11 +71,14 @@ public class DBService {
 	public boolean createBatchEntry(EmailEntry entry) {
 		String tableName = "batch_" + entry.getSystemId();
 
-		String createTableSQL = "CREATE TABLE IF NOT EXISTS " + tableName + " (" + "batch_id BIGINT PRIMARY KEY, "
-				+ "system_id VARCHAR(50), " + "smtp_id INT, " + "ip_address VARCHAR(50), " + "subject TEXT, "
-				+ "body TEXT, " + "cc_recipients TEXT, " + "bcc_recipients TEXT, " + "attachments TEXT, "
-				+ "total_recipients INT, " + "delay double(10,5) NOT NULL DEFAULT 0, " + "created_on TIMESTAMP, "
-				+ "updated_on TIMESTAMP NULL, " + "status VARCHAR(20)" + ")";
+		StringBuilder sb = new StringBuilder();
+		sb.append("CREATE TABLE IF NOT EXISTS ").append(tableName).append(" (").append("batch_id BIGINT PRIMARY KEY, ")
+				.append("system_id VARCHAR(50), ").append("smtp_id INT, ").append("ip_address VARCHAR(50), ")
+				.append("subject TEXT, ").append("body TEXT, ").append("cc_recipients TEXT, ")
+				.append("bcc_recipients TEXT, ").append("attachments TEXT, ").append("total_recipients INT, ")
+				.append("delay DOUBLE(10,5) NOT NULL DEFAULT 0, ").append("created_on TIMESTAMP, ")
+				.append("updated_on TIMESTAMP NULL, ").append("status VARCHAR(12) NOT NULL DEFAULT ACTIVE, ")
+				.append("type VARCHAR(12) NOT NULL DEFAULT IMMEDIATE").append(") ENGINE=MyISAM");
 
 		String insertSQL = "INSERT INTO " + tableName + " (batch_id, system_id, smtp_id, ip_address, subject, body,"
 				+ " cc_recipients, bcc_recipients, attachments, total_recipients, delay,"
@@ -76,7 +86,7 @@ public class DBService {
 		// updated_on always NULL
 
 		try (Connection con = GlobalVar.connectionPool.getConnection();
-				PreparedStatement createStmt = con.prepareStatement(createTableSQL);
+				PreparedStatement createStmt = con.prepareStatement(sb.toString());
 				PreparedStatement insertStmt = con.prepareStatement(insertSQL)) {
 
 			createStmt.executeUpdate();
@@ -268,7 +278,8 @@ public class DBService {
 							rs.getString("ip_address"), rs.getString("subject"), rs.getString("body"),
 							rs.getString("cc_recipients"), rs.getString("bcc_recipients"), rs.getString("attachments"),
 							rs.getInt("total_recipients"), rs.getTimestamp("created_on"),
-							EmailEntry.BatchStatus.valueOf(rs.getString("status")), rs.getDouble("delay"));
+							EmailEntry.BatchStatus.valueOf(rs.getString("status")), rs.getDouble("delay"),
+							EmailEntry.BatchType.valueOf(rs.getString("type")));
 				}
 			}
 		} catch (SQLException e) {
@@ -310,7 +321,7 @@ public class DBService {
 								rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
 								rs.getString("attachments"), rs.getInt("total_recipients"),
 								rs.getTimestamp("created_on"), EmailEntry.BatchStatus.valueOf(rs.getString("status")),
-								rs.getDouble("delay")));
+								rs.getDouble("delay"), EmailEntry.BatchType.valueOf(rs.getString("type"))));
 					}
 
 				} catch (SQLException e) {
@@ -368,7 +379,8 @@ public class DBService {
 						rs.getString("ip_address"), rs.getString("subject"), rs.getString("body"),
 						rs.getString("cc_recipients"), rs.getString("bcc_recipients"), rs.getString("attachments"),
 						rs.getInt("total_recipients"), rs.getTimestamp("created_on"),
-						EmailEntry.BatchStatus.valueOf(rs.getString("status")), rs.getDouble("delay")));
+						EmailEntry.BatchStatus.valueOf(rs.getString("status")), rs.getDouble("delay"),
+						EmailEntry.BatchType.valueOf(rs.getString("type"))));
 			}
 			logger.info("{} Batches: {}", systemId, list.size());
 		} catch (SQLException e) {
@@ -465,6 +477,326 @@ public class DBService {
 			}
 		} catch (SQLException e) {
 			logger.error("SQL error when adding partition", e);
+		}
+	}
+
+	public boolean createScheduleEntry(ScheduleEntry entry) {
+		String tableName = "schedule_" + entry.getSystemId();
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("CREATE TABLE IF NOT EXISTS ").append(tableName).append(" (").append("batch_id BIGINT PRIMARY KEY, ")
+				.append("system_id VARCHAR(15), ").append("smtp_id INT, ").append("ip_address VARCHAR(50), ")
+				.append("subject TEXT, ").append("body TEXT, ").append("cc_recipients TEXT, ")
+				.append("bcc_recipients TEXT, ").append("attachments TEXT, ").append("total_recipients INT, ")
+				.append("delay DOUBLE(10,5) NOT NULL DEFAULT 0, ").append("created_on TIMESTAMP, ")
+				.append("updated_on TIMESTAMP NULL, ").append("gmt VARCHAR(10), ").append("schedule_on TIMESTAMP, ")
+				.append("server_time TIMESTAMP").append("status VARCHAR(12) NOT NULL DEFAULT PENDING")
+				.append(") ENGINE=MyISAM");
+
+		String insertSQL = "INSERT INTO " + tableName + " (batch_id, system_id, smtp_id, ip_address, subject, body,"
+				+ " cc_recipients, bcc_recipients, attachments, total_recipients, delay,"
+				+ " created_on, gmt,schedule_on,server_time)" + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)";
+		// updated_on always NULL
+
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement createStmt = con.prepareStatement(sb.toString());
+				PreparedStatement insertStmt = con.prepareStatement(insertSQL)) {
+
+			createStmt.executeUpdate();
+
+			insertStmt.setString(1, entry.getBatchId());
+			insertStmt.setString(2, entry.getSystemId());
+			insertStmt.setInt(3, entry.getSmtpId());
+			insertStmt.setString(4, entry.getIpAddress());
+			insertStmt.setString(5, entry.getSubject());
+			insertStmt.setString(6, entry.getBody());
+			insertStmt.setString(7, entry.getCcRecipients());
+			insertStmt.setString(8, entry.getBccRecipients());
+			insertStmt.setString(9, entry.getAttachments());
+			insertStmt.setInt(10, entry.getTotalRecipients());
+			insertStmt.setDouble(11, entry.getDelay());
+			insertStmt.setTimestamp(12, entry.getCreatedOn());
+			insertStmt.setString(13, entry.getGmt());
+			insertStmt.setTimestamp(14, Timestamp.valueOf(entry.getScheduledOn()));
+			insertStmt.setTimestamp(15, Timestamp.valueOf(entry.getServerTime()));
+			return insertStmt.executeUpdate() > 0;
+
+		} catch (SQLException e) {
+			logger.error("Error creating Schedule entry for systemId {}: {}", entry.getSystemId(), e.getMessage(), e);
+		}
+		return false;
+	}
+
+	public boolean saveScheduledRecipients(List<String> list, String systemId, String batchId) {
+		if (list == null || list.isEmpty()) {
+			return false;
+		}
+
+		String tableName = "schedule_recipient_" + systemId.toLowerCase() + "_" + batchId;
+
+		String createTableSQL = "CREATE TABLE IF NOT EXISTS " + tableName + " ("
+				+ "recipient VARCHAR(50) NOT NULL PRIMARY KEY" + ") ENGINE=MyISAM";
+
+		// Create table only once
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement createStmt = con.prepareStatement(createTableSQL)) {
+			createStmt.executeUpdate();
+		} catch (SQLException e) {
+			logger.error("Table creation failed for Schedule {}: {}", batchId, e.getMessage(), e);
+			return false;
+		}
+
+		ExecutorService executor = Executors.newFixedThreadPool(10);
+
+		List<CompletableFuture<Boolean>> tasks = list.stream()
+				.map(entry -> CompletableFuture.supplyAsync(() -> insertScheduleRecipient(entry, tableName), executor))
+				.toList();
+
+		try {
+			CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0])).get();
+		} catch (Exception e) {
+			logger.error("Insertion error: {}", e.getMessage(), e);
+			executor.shutdown();
+			return false;
+		}
+
+		executor.shutdown();
+
+		// Final success check
+		return tasks.stream().allMatch(CompletableFuture::join);
+	}
+
+	private boolean insertScheduleRecipient(String recipient, String tableName) {
+		String insertSQL = "INSERT IGNORE INTO " + tableName + " (recipient) VALUES (?)";
+		// INSERT IGNORE prevents duplicate key failure
+
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = con.prepareStatement(insertSQL)) {
+			stmt.setString(1, recipient);
+			stmt.executeUpdate();
+			return true;
+
+		} catch (SQLException e) {
+			logger.error("Insert failed for recipient {}: {}", recipient, e.getMessage());
+			return false;
+		}
+	}
+
+	public List<ScheduleEntry> loadTodaySchedules() {
+		String sql = "SHOW TABLES LIKE 'schedule_%'";
+		logger.info(" SQL: " + sql.toString());
+		Set<String> tables = new HashSet<String>();
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql.toString());
+				ResultSet rs = statement.executeQuery()) {
+			while (rs.next()) {
+				tables.add(rs.getString(1));
+			}
+			logger.info("Tables: {}", tables.size());
+		} catch (SQLException e) {
+			logger.error("SQL error in {} Tables list", e);
+		} catch (Exception e) {
+			logger.error("Unexpected error in {} Tables list", e);
+		}
+		List<ScheduleEntry> list = new ArrayList<>();
+
+		String query = "SELECT * FROM %s WHERE DATE(server_time) = '"
+				+ new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + "' and status = 'PENDING'";
+
+		try (Connection connection = GlobalVar.connectionPool.getConnection()) {
+			for (String table : tables) {
+				String finalQuery = String.format(query, table);
+				logger.info(finalQuery);
+				try (PreparedStatement statement = connection.prepareStatement(finalQuery);
+						ResultSet rs = statement.executeQuery()) {
+					while (rs.next()) {
+						list.add(new ScheduleEntry(rs.getString("batch_id"), rs.getString("system_id"),
+								rs.getString("ip_address"), rs.getInt("smtp_id"), rs.getString("subject"),
+								rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
+								rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
+								rs.getTimestamp("created_on"), rs.getTimestamp("server_time").toLocalDateTime(),
+								rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime()));
+					}
+
+				} catch (SQLException e) {
+					logger.error("Error reading table {}", table, e);
+				}
+			}
+
+			logger.info("Today Scheduled entries collected: {}", list.size());
+
+		} catch (SQLException e) {
+			logger.error("SQL error when creating DB connection", e);
+		}
+		return list;
+	}
+
+	public ScheduleEntry getScheduleEntry(String systemId, String batchId) {
+		ScheduleEntry entry = null;
+		String query = "SELECT * FROM schedule_" + systemId + " WHERE batch_id = ?";
+		logger.info("Executing: {}", query);
+
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement statement = connection.prepareStatement(query)) {
+			statement.setString(1, batchId);
+			try (ResultSet rs = statement.executeQuery()) {
+				if (rs.next()) {
+					entry = new ScheduleEntry(rs.getString("batch_id"), rs.getString("system_id"),
+							rs.getString("ip_address"), rs.getInt("smtp_id"), rs.getString("subject"),
+							rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
+							rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
+							rs.getTimestamp("created_on"), rs.getTimestamp("server_time").toLocalDateTime(),
+							rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime());
+				}
+			}
+			logger.info("Scheduled entry collected: {}", entry);
+		} catch (SQLException e) {
+			logger.error("SQL error while fetching schedule entry", e);
+		}
+
+		return entry;
+	}
+
+	public boolean abortSchedule(String systemId, String batchId) {
+		String table = "schedule_" + systemId;
+		String sql = "update " + table + " set status = ? WHERE batch_id = ?";
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+			stmt.setString(1, batchId);
+			stmt.setString(2, "ABORTED");
+			int rows = stmt.executeUpdate();
+			if (rows > 0) {
+				logger.info("Schedule entry aborted from DB for batch {}", batchId);
+				return true;
+			}
+		} catch (SQLException e) {
+			logger.error("Error aborting schedule for batch {}", batchId, e);
+		}
+
+		return false;
+	}
+
+	public boolean updateScheduleEntry(ScheduleEntry entry) {
+		String table = "schedule_" + entry.getSystemId();
+
+		String sql = "UPDATE " + table + " SET " + "smtp_id = ?, subject = ?, body = ?, "
+				+ "cc_recipients = ?, bcc_recipients = ?, "
+				+ " delay = ?,updated_on = NOW(), gmt=?, schedule_on=?, server_time=? " + "WHERE batch_id = ?";
+
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = connection.prepareStatement(sql)) {
+			stmt.setInt(1, entry.getSmtpId());
+			stmt.setString(2, entry.getSubject());
+			stmt.setString(3, entry.getBody());
+			stmt.setString(4, entry.getCcRecipients());
+			stmt.setString(5, entry.getBccRecipients());
+			stmt.setDouble(6, entry.getDelay());
+			stmt.setString(7, entry.getGmt());
+			stmt.setTimestamp(8, Timestamp.valueOf(entry.getScheduledOn()));
+			stmt.setTimestamp(9, Timestamp.valueOf(entry.getServerTime()));
+			stmt.setString(10, entry.getBatchId());
+			int rows = stmt.executeUpdate();
+			if (rows > 0) {
+				logger.info("Schedule entry Updated for batch {}", entry.getBatchId());
+				return true;
+			}
+		} catch (SQLException e) {
+			logger.error("Error updating Scheduled Batch {}", entry.getBatchId(), e);
+		}
+		return false;
+	}
+
+	public List<ScheduleEntry> listSchedules(String systemId, ScheduleFilterRequest batchProcessFilterRequest) {
+		StringBuilder sql = new StringBuilder("SELECT * FROM schedule_" + systemId);
+		if (batchProcessFilterRequest != null) {
+			List<String> conditions = new ArrayList<>();
+			if (batchProcessFilterRequest.getBatchId() > 0) {
+				conditions.add("batch_id = " + batchProcessFilterRequest.getBatchId());
+			} else {
+				if (batchProcessFilterRequest.getSmtpId() > 0) {
+					conditions.add("smtp_id = " + batchProcessFilterRequest.getSmtpId());
+				}
+				if (batchProcessFilterRequest.getStartTime() != null
+						&& batchProcessFilterRequest.getEndTime() != null) {
+					conditions.add("schedule_on BETWEEN '" + batchProcessFilterRequest.getStartTime() + "' AND '"
+							+ batchProcessFilterRequest.getEndTime() + "'");
+				}
+			}
+			if (!conditions.isEmpty()) {
+				sql.append(" WHERE ").append(String.join(" AND ", conditions));
+			}
+
+		}
+		logger.info(systemId + " SQL: " + sql.toString());
+		List<ScheduleEntry> list = new ArrayList<ScheduleEntry>();
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+			try (ResultSet rs = statement.executeQuery()) {
+				while (rs.next()) {
+					list.add(new ScheduleEntry(rs.getString("batch_id"), rs.getString("system_id"),
+							rs.getString("ip_address"), rs.getInt("smtp_id"), rs.getString("subject"),
+							rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
+							rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
+							rs.getTimestamp("created_on"), rs.getTimestamp("server_time").toLocalDateTime(),
+							rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime()));
+				}
+			}
+			logger.info("Scheduled entries collected: {}", list.size());
+		} catch (SQLException e) {
+			logger.error("SQL error while fetching schedule entry", e);
+		}
+		return list;
+	}
+
+	public List<String> listScheduledRecipients(String systemId, String batchId) {
+		String tableName = "schedule_recipient_" + systemId.toLowerCase() + "_" + batchId;
+		List<String> list = new ArrayList<String>();
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement statement = connection.prepareStatement("select recipient from " + tableName)) {
+			try (ResultSet rs = statement.executeQuery()) {
+				while (rs.next()) {
+					list.add(rs.getString("recipient"));
+				}
+			}
+			logger.info(tableName + " Scheduled Recipients collected: {}", list.size());
+		} catch (SQLException e) {
+			logger.error(tableName + " SQL error while fetching Scheduled Recipients", e);
+		}
+		return list;
+	}
+
+	public void clearScheduleEntry(String systemId, String batchId) {
+		String scheduleTable = "schedule_" + systemId;
+		String recipientTable = "schedule_recipient_" + systemId.toLowerCase() + "_" + batchId;
+
+		// 1. Mark schedule entry as finished (recommended) OR delete it
+		String updateSql = "UPDATE " + scheduleTable + " SET status = 'FINISHED' WHERE batch_id = ?";
+
+		// 2. Drop recipient table if exists
+		String dropSql = "DROP TABLE IF EXISTS " + recipientTable;
+
+		try (Connection connection = GlobalVar.connectionPool.getConnection()) {
+
+			// ---------- Update Schedule Table ----------
+			try (PreparedStatement ps = connection.prepareStatement(updateSql)) {
+				ps.setString(1, batchId);
+				int rows = ps.executeUpdate();
+				logger.info("Updated schedule entry, affected rows: {}", rows);
+			} catch (SQLException e) {
+				logger.error("Error updating schedule entry for table {}", scheduleTable, e);
+			}
+
+			// ---------- Drop Recipient Table ----------
+			try (PreparedStatement ps = connection.prepareStatement(dropSql)) {
+				ps.executeUpdate();
+				logger.info("Dropped recipient table: {}", recipientTable);
+			} catch (SQLException e) {
+				logger.error("Error dropping recipient table {}", recipientTable, e);
+			}
+
+		} catch (SQLException e) {
+			logger.error("SQL error creating DB connection", e);
 		}
 	}
 
