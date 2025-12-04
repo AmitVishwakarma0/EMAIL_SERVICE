@@ -77,19 +77,25 @@ public class DBService {
 				.append("subject TEXT, ").append("body TEXT, ").append("cc_recipients TEXT, ")
 				.append("bcc_recipients TEXT, ").append("attachments TEXT, ").append("total_recipients INT, ")
 				.append("delay DOUBLE(10,5) NOT NULL DEFAULT 0, ").append("created_on TIMESTAMP, ")
-				.append("updated_on TIMESTAMP NULL, ").append("status VARCHAR(12) NOT NULL DEFAULT ACTIVE, ")
-				.append("type VARCHAR(12) NOT NULL DEFAULT IMMEDIATE").append(") ENGINE=MyISAM");
+				.append("updated_on TIMESTAMP NULL, ").append("status VARCHAR(12) NOT NULL DEFAULT 'ACTIVE', ")
+				.append("type VARCHAR(12) NOT NULL DEFAULT 'IMMEDIATE'").append(") ENGINE=MyISAM");
+		System.out.println("CreateSQL: " + sb.toString());
 
 		String insertSQL = "INSERT INTO " + tableName + " (batch_id, system_id, smtp_id, ip_address, subject, body,"
 				+ " cc_recipients, bcc_recipients, attachments, total_recipients, delay,"
-				+ " created_on, updated_on, status)" + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)";
+				+ " created_on, updated_on, status,type)" + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?,?)";
 		// updated_on always NULL
+		System.out.println("insertSQL: " + insertSQL);
 
 		try (Connection con = GlobalVar.connectionPool.getConnection();
 				PreparedStatement createStmt = con.prepareStatement(sb.toString());
 				PreparedStatement insertStmt = con.prepareStatement(insertSQL)) {
 
-			createStmt.executeUpdate();
+			if (createStmt.executeUpdate() > 0) {
+				logger.info(tableName + " Created.");
+			} else {
+				logger.info(tableName + " Not Created.");
+			}
 
 			insertStmt.setString(1, entry.getBatchId());
 			insertStmt.setString(2, entry.getSystemId());
@@ -104,10 +110,10 @@ public class DBService {
 			insertStmt.setDouble(11, entry.getDelay());
 			insertStmt.setTimestamp(12, entry.getCreatedOn());
 			insertStmt.setString(13, entry.getBatchStatus().name());
-
+			insertStmt.setString(14, entry.getBatchType().name());
 			return insertStmt.executeUpdate() > 0;
 
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			logger.error("Error creating batch entry for system {}: {}", entry.getSystemId(), e.getMessage(), e);
 		}
 		return false;
@@ -274,11 +280,11 @@ public class DBService {
 			stmt.setString(1, batchId);
 			try (ResultSet rs = stmt.executeQuery()) {
 				if (rs.next()) {
-					return new EmailEntry(rs.getString("batch_id"), rs.getString("system_id"), rs.getInt("smtp_id"),
-							rs.getString("ip_address"), rs.getString("subject"), rs.getString("body"),
-							rs.getString("cc_recipients"), rs.getString("bcc_recipients"), rs.getString("attachments"),
-							rs.getInt("total_recipients"), rs.getTimestamp("created_on"),
-							EmailEntry.BatchStatus.valueOf(rs.getString("status")), rs.getDouble("delay"),
+					return new EmailEntry(rs.getString("batch_id"), rs.getString("system_id"),
+							rs.getString("ip_address"), rs.getInt("smtp_id"), rs.getString("subject"),
+							rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
+							rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
+							rs.getTimestamp("created_on"), EmailEntry.BatchStatus.valueOf(rs.getString("status")),
 							EmailEntry.BatchType.valueOf(rs.getString("type")));
 				}
 			}
@@ -317,11 +323,11 @@ public class DBService {
 
 					while (rs.next()) {
 						list.add(new EmailEntry(rs.getString("batch_id"), rs.getString("system_id"),
-								rs.getInt("smtp_id"), rs.getString("ip_address"), rs.getString("subject"),
+								rs.getString("ip_address"), rs.getInt("smtp_id"), rs.getString("subject"),
 								rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
-								rs.getString("attachments"), rs.getInt("total_recipients"),
+								rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
 								rs.getTimestamp("created_on"), EmailEntry.BatchStatus.valueOf(rs.getString("status")),
-								rs.getDouble("delay"), EmailEntry.BatchType.valueOf(rs.getString("type"))));
+								EmailEntry.BatchType.valueOf(rs.getString("type"))));
 					}
 
 				} catch (SQLException e) {
@@ -375,11 +381,11 @@ public class DBService {
 				PreparedStatement statement = connection.prepareStatement(sql.toString());
 				ResultSet rs = statement.executeQuery()) {
 			while (rs.next()) {
-				list.add(new EmailEntry(rs.getString("batch_id"), rs.getString("system_id"), rs.getInt("smtp_id"),
-						rs.getString("ip_address"), rs.getString("subject"), rs.getString("body"),
+				list.add(new EmailEntry(rs.getString("batch_id"), rs.getString("system_id"), rs.getString("ip_address"),
+						rs.getInt("smtp_id"), rs.getString("subject"), rs.getString("body"),
 						rs.getString("cc_recipients"), rs.getString("bcc_recipients"), rs.getString("attachments"),
-						rs.getInt("total_recipients"), rs.getTimestamp("created_on"),
-						EmailEntry.BatchStatus.valueOf(rs.getString("status")), rs.getDouble("delay"),
+						rs.getDouble("delay"), rs.getInt("total_recipients"), rs.getTimestamp("created_on"),
+						EmailEntry.BatchStatus.valueOf(rs.getString("status")),
 						EmailEntry.BatchType.valueOf(rs.getString("type"))));
 			}
 			logger.info("{} Batches: {}", systemId, list.size());
@@ -490,7 +496,7 @@ public class DBService {
 				.append("bcc_recipients TEXT, ").append("attachments TEXT, ").append("total_recipients INT, ")
 				.append("delay DOUBLE(10,5) NOT NULL DEFAULT 0, ").append("created_on TIMESTAMP, ")
 				.append("updated_on TIMESTAMP NULL, ").append("gmt VARCHAR(10), ").append("schedule_on TIMESTAMP, ")
-				.append("server_time TIMESTAMP").append("status VARCHAR(12) NOT NULL DEFAULT PENDING")
+				.append("server_time TIMESTAMP,").append("status VARCHAR(12) NOT NULL DEFAULT 'PENDING'")
 				.append(") ENGINE=MyISAM");
 
 		String insertSQL = "INSERT INTO " + tableName + " (batch_id, system_id, smtp_id, ip_address, subject, body,"
@@ -615,7 +621,8 @@ public class DBService {
 								rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
 								rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
 								rs.getTimestamp("created_on"), rs.getTimestamp("server_time").toLocalDateTime(),
-								rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime()));
+								rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime(),
+								EmailEntry.BatchStatus.valueOf(rs.getString("status"))));
 					}
 
 				} catch (SQLException e) {
@@ -646,7 +653,8 @@ public class DBService {
 							rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
 							rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
 							rs.getTimestamp("created_on"), rs.getTimestamp("server_time").toLocalDateTime(),
-							rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime());
+							rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime(),
+							EmailEntry.BatchStatus.valueOf(rs.getString("status")));
 				}
 			}
 			logger.info("Scheduled entry collected: {}", entry);
@@ -662,9 +670,8 @@ public class DBService {
 		String sql = "update " + table + " set status = ? WHERE batch_id = ?";
 		try (Connection connection = GlobalVar.connectionPool.getConnection();
 				PreparedStatement stmt = connection.prepareStatement(sql)) {
-
-			stmt.setString(1, batchId);
-			stmt.setString(2, "ABORTED");
+			stmt.setString(1, "ABORTED");
+			stmt.setString(2, batchId);
 			int rows = stmt.executeUpdate();
 			if (rows > 0) {
 				logger.info("Schedule entry aborted from DB for batch {}", batchId);
@@ -739,7 +746,8 @@ public class DBService {
 							rs.getString("body"), rs.getString("cc_recipients"), rs.getString("bcc_recipients"),
 							rs.getString("attachments"), rs.getDouble("delay"), rs.getInt("total_recipients"),
 							rs.getTimestamp("created_on"), rs.getTimestamp("server_time").toLocalDateTime(),
-							rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime()));
+							rs.getString("gmt"), rs.getTimestamp("schedule_on").toLocalDateTime(),
+							EmailEntry.BatchStatus.valueOf(rs.getString("status"))));
 				}
 			}
 			logger.info("Scheduled entries collected: {}", list.size());

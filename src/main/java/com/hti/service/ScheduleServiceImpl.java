@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.hazelcast.internal.json.JsonArray;
 import com.hti.database.service.DBService;
 import com.hti.entity.EmailEntry;
+import com.hti.entity.EmailEntry.BatchStatus;
 import com.hti.entity.ScheduleEntry;
 import com.hti.exception.InvalidRequestException;
 import com.hti.exception.ProcessingException;
@@ -60,6 +61,10 @@ public class ScheduleServiceImpl implements ScheduleService {
 		ScheduleEntry entry = dbService.getScheduleEntry(systemId, batchId);
 		if (entry == null) {
 			throw new InvalidRequestException(batchId + " No Scheduled Entry Found");
+		}
+		if (entry.getBatchStatus() != BatchStatus.PENDING) {
+			throw new InvalidRequestException(
+					batchId + " Scheduled Entry[" + String.valueOf(entry.getBatchStatus()) + "] Not Editable");
 		}
 		schedulerManager.cancelSchedule(systemId, batchId);
 		return prepareResponse(entry, true);
@@ -103,6 +108,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 	private EmailScheduleResponse prepareResponse(ScheduleEntry entry, boolean attachment) {
 		EmailScheduleResponse response = new EmailScheduleResponse();
 		BeanUtils.copyProperties(entry, response);
+		response.setStatus(entry.getBatchStatus().name());
 		if (attachment) {
 			List<MultipartFile> attachmentList = new ArrayList<MultipartFile>();
 			if (entry.getAttachments() != null && !entry.getAttachments().isEmpty()) {

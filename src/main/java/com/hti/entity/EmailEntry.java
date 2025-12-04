@@ -46,13 +46,13 @@ public class EmailEntry {
 	private BatchType batchType;
 
 	public enum BatchStatus {
-		ACTIVE, PAUSED, ABORTED, FINISHED
+		ACTIVE, PAUSED, ABORTED, FINISHED, PENDING
 	}
 
 	public enum BatchType {
 		IMMEDIATE, SCHEDULED
 	}
-	
+
 	public EmailEntry(String batchId, String systemId, String ipAddress) {
 		this.batchId = batchId;
 		this.systemId = systemId;
@@ -78,7 +78,7 @@ public class EmailEntry {
 
 	public EmailEntry(String batchId, String systemId, String ipAddress, int smtpId, String subject, String body,
 			String ccRecipients, String bccRecipients, String attachments, double delay, int totalRecipients,
-			Timestamp createdOn) {
+			Timestamp createdOn, BatchStatus batchStatus) {
 		this.batchId = batchId;
 		this.systemId = systemId;
 		this.ipAddress = ipAddress;
@@ -91,11 +91,12 @@ public class EmailEntry {
 		this.delay = delay;
 		this.totalRecipients = totalRecipients;
 		this.createdOn = createdOn;
+		this.batchStatus = batchStatus;
 	}
 
-	public EmailEntry(String batchId, String systemId, int smtpId, String ipAddress, String subject, String body,
-			String ccRecipients, String bccRecipients, String attachments, int totalRecipients, Timestamp createdOn,
-			BatchStatus batchStatus, double delay, BatchType batchType) {
+	public EmailEntry(String batchId, String systemId, String ipAddress, int smtpId, String subject, String body,
+			String ccRecipients, String bccRecipients, String attachments, double delay, int totalRecipients,
+			Timestamp createdOn, BatchStatus batchStatus, BatchType batchType) {
 		this.batchId = batchId;
 		this.systemId = systemId;
 		this.smtpId = smtpId;

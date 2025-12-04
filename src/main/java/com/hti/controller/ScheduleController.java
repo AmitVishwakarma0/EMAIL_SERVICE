@@ -122,7 +122,7 @@ public class ScheduleController {
 	public ResponseEntity<?> editBatch(
 			@Parameter(description = "Authenticated username or requester", example = "testUser", required = true) @RequestHeader String username,
 			@Parameter(description = "Client IP address making the request", example = "127.0.0.1", required = true) @RequestHeader @NotBlank(message = "IP address header is required") String ipAddress,
-			@Parameter(description = "Unique batch ID to edit", example = "123", required = true) @RequestParam(name = "batch_Id") String batchId) {
+			@Parameter(description = "Unique batch ID to edit", example = "2512041546538901001", required = true) @RequestParam(name = "batch_Id") String batchId) {
 		return ResponseEntity.ok(batchService.editSchedule(username, ipAddress, batchId));
 	}
 
@@ -152,7 +152,7 @@ public class ScheduleController {
 	public ResponseEntity<?> abortBatch(
 			@Parameter(description = "Authenticated username or requester", example = "testUser", required = true) @RequestHeader String username,
 			@Parameter(description = "Client IP address making the request", example = "127.0.0.1", required = true) @RequestHeader @NotBlank(message = "IP address header is required") String ipAddress,
-			@Parameter(description = "Unique batch ID to abort", example = "123", required = true) @RequestParam(name = "batch_Id") String batchId) {
+			@Parameter(description = "Unique batch ID to abort", example = "2512041546538901001", required = true) @RequestParam(name = "batch_Id") String batchId) {
 		batchService.abortSchedule(username, ipAddress, batchId);
 		return ResponseEntity.ok(Map.of("status", "success", "batchId", batchId));
 	}

@@ -8,4 +8,5 @@ import lombok.Data;
 public class EmailScheduleResponse extends ScheduleEmailRequest {
 	private LocalDateTime createdOn;
 	private int totalRecipients;
+	private String status;
 }
