@@ -30,6 +30,7 @@ import com.hti.exception.InvalidRequestException;
 import com.hti.listener.FlagEventListener;
 import com.hti.process.EmailProcessor;
 import com.hti.process.SchedulerManager;
+import com.hti.service.SingletonService;
 import com.hti.util.FileUtil;
 import com.hti.util.GlobalVar;
 
@@ -57,14 +58,14 @@ public class ServiceController implements Runnable {
 		loadConfiguration();
 		initializeGlobalVars();
 		FileUtil.setDefaultFlag(GlobalVar.FLAG_DIR + "//Application.flag");
-		 ExecutorService exec = Executors.newSingleThreadExecutor();
-		    exec.submit(() -> {
-		        try {
-		            loadPendingEntriesAsync();
-		        } finally {
-		            exec.shutdown();
-		        }
-		    });
+		ExecutorService exec = Executors.newSingleThreadExecutor();
+		exec.submit(() -> {
+			try {
+				loadPendingEntriesAsync();
+			} finally {
+				exec.shutdown();
+			}
+		});
 		new Thread(this, "Monitor").start();
 	}
 
@@ -208,11 +209,23 @@ public class ServiceController implements Runnable {
 			logger.error(entry.getSystemId() + "[" + entry.getBatchId() + "]", e.getMessage());
 		}
 	}
-	
 
 	private void stopProcess() {
-		// TODO Auto-generated method stub
+		stopRunningBatches();
+		SingletonService.clear();
+	}
 
+	private void stopRunningBatches() {
+		GlobalVar.processingMap.forEach((systemId, batchMap) -> {
+			batchMap.forEach((batchId, processor) -> {
+				try {
+					processor.stop();
+				} catch (Exception ignored) {
+				}
+			});
+		});
+
+		GlobalVar.processingMap.clear();
 	}
 
 }

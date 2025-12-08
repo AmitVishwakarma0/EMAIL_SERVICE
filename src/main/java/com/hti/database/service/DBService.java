@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hti.entity.EmailEntry;
+import com.hti.entity.ImapEntry;
 import com.hti.entity.RecipientsEntry;
 import com.hti.entity.ScheduleEntry;
 import com.hti.entity.SmtpEntry;
@@ -35,7 +36,7 @@ import com.hti.util.GlobalVar;
 
 public class DBService {
 
-	private Logger logger = LoggerFactory.getLogger("dbLogger");
+	private Logger logger = LoggerFactory.getLogger(DBService.class);
 
 	public SmtpEntry getSmtpEntry(String systemId, int smtpId) {
 		String sql = "SELECT * FROM smtp_config WHERE id = ? and system_id = ?";
@@ -54,6 +55,7 @@ public class DBService {
 				entry.setEmailUser(rs.getString("email_user"));
 				entry.setEmailPassword(rs.getString("email_password"));
 				entry.setVerified(rs.getBoolean("verified"));
+				entry.setWebhookUrl(rs.getString("web_hook_url"));
 				String enc = rs.getString("encryption_type");
 				entry.setEncryptionType(enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
 						: SmtpEntry.EncryptionType.NONE);
@@ -410,7 +412,7 @@ public class DBService {
 		}
 	}
 
-	public void addPartition() {
+	public void addUserReportPartition() {
 		String sql = "SHOW TABLES LIKE 'report_%'";
 		logger.info("SQL: {}", sql);
 
@@ -537,9 +539,7 @@ public class DBService {
 		if (list == null || list.isEmpty()) {
 			return false;
 		}
-
-		String tableName = "schedule_recipient_" + systemId.toLowerCase() + "_" + batchId;
-
+		String tableName = "sch_recipient_" + systemId.toLowerCase() + "_" + batchId;
 		String createTableSQL = "CREATE TABLE IF NOT EXISTS " + tableName + " ("
 				+ "recipient VARCHAR(50) NOT NULL PRIMARY KEY" + ") ENGINE=MyISAM";
 
@@ -758,7 +758,7 @@ public class DBService {
 	}
 
 	public List<String> listScheduledRecipients(String systemId, String batchId) {
-		String tableName = "schedule_recipient_" + systemId.toLowerCase() + "_" + batchId;
+		String tableName = "sch_recipient_" + systemId.toLowerCase() + "_" + batchId;
 		List<String> list = new ArrayList<String>();
 		try (Connection connection = GlobalVar.connectionPool.getConnection();
 				PreparedStatement statement = connection.prepareStatement("select recipient from " + tableName)) {
@@ -776,7 +776,7 @@ public class DBService {
 
 	public void clearScheduleEntry(String systemId, String batchId) {
 		String scheduleTable = "schedule_" + systemId;
-		String recipientTable = "schedule_recipient_" + systemId.toLowerCase() + "_" + batchId;
+		String recipientTable = "sch_recipient_" + systemId.toLowerCase() + "_" + batchId;
 
 		// 1. Mark schedule entry as finished (recommended) OR delete it
 		String updateSql = "UPDATE " + scheduleTable + " SET status = 'FINISHED' WHERE batch_id = ?";
@@ -805,6 +805,104 @@ public class DBService {
 
 		} catch (SQLException e) {
 			logger.error("SQL error creating DB connection", e);
+		}
+	}
+
+	public List<ImapEntry> listImapEntries() {
+		List<ImapEntry> list = new ArrayList<ImapEntry>();
+		String sql = "SELECT * FROM smtp_config WHERE read_inbox = ? and verified = ? and imap_host IS NOT NULL and imap_port > 0";
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = con.prepareStatement(sql)) {
+			stmt.setBoolean(1, true);
+			stmt.setBoolean(2, true);
+			ResultSet rs = stmt.executeQuery();
+			while (rs.next()) {
+				String enc = rs.getString("imap_enc_type");
+				list.add(new ImapEntry(rs.getInt("id"), rs.getString("system_id"), rs.getString("imap_host"),
+						rs.getInt("imap_port"), rs.getString("email_user"), rs.getString("email_password"),
+						enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
+								: SmtpEntry.EncryptionType.NONE));
+			}
+		} catch (SQLException e) {
+			logger.error("Error fetching SMTP entries", e);
+		}
+
+		return list;
+	}
+
+	public void addUserInboxPartition() {
+		String sql = "SHOW TABLES LIKE 'inbox_%'";
+		logger.info("SQL: {}", sql);
+
+		Set<String> tables = new HashSet<>();
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql);
+				ResultSet rs = statement.executeQuery()) {
+
+			while (rs.next()) {
+				tables.add(rs.getString(1));
+			}
+			logger.info("Tables found: {}", tables.size());
+		} catch (SQLException e) {
+			logger.error("SQL error in Tables list", e);
+			return;
+		}
+
+		// Tomorrow partition parameters
+		String nextPartitionName = "p" + LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyMMdd"));
+
+		String nextPartitionValue = LocalDate.now().plusDays(2).format(DateTimeFormatter.ofPattern("yyMMdd"));
+
+		try (Connection connection = GlobalVar.connectionPool.getConnection()) {
+			for (String table : tables) {
+
+				// 1) Check if the partition already exists
+				String checkSql = "SELECT PARTITION_NAME FROM INFORMATION_SCHEMA.PARTITIONS "
+						+ "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND PARTITION_NAME = ?";
+				try (PreparedStatement ps = connection.prepareStatement(checkSql)) {
+					ps.setString(1, table);
+					ps.setString(2, nextPartitionName);
+
+					try (ResultSet rs = ps.executeQuery()) {
+						if (rs.next()) {
+							logger.info("Partition {} already exists on {}", nextPartitionName, table);
+							continue; // skip
+						}
+					}
+				}
+
+				// 2) Drop pmax partition (needed before adding new partition)
+				String dropMax = "ALTER TABLE " + table + " DROP PARTITION pmax";
+				logger.info("Dropping pmax on {}", table);
+
+				try (PreparedStatement ps = connection.prepareStatement(dropMax)) {
+					ps.execute();
+				} catch (SQLException e) {
+					logger.warn("pmax drop failed on {} (maybe already dropped)", table);
+				}
+
+				// 3) Add new next-day partition
+				String addPartitionSql = "ALTER TABLE " + table + " ADD PARTITION (PARTITION " + nextPartitionName
+						+ " VALUES LESS THAN (" + nextPartitionValue + "))";
+
+				logger.info("Adding partition {} to {}", nextPartitionName, table);
+				try (PreparedStatement ps = connection.prepareStatement(addPartitionSql)) {
+					ps.execute();
+				}
+
+				// 4) Re-add pmax partition
+				String addMaxSql = "ALTER TABLE " + table
+						+ " ADD PARTITION (PARTITION pmax VALUES LESS THAN (MAXVALUE))";
+
+				logger.info("Re-adding pmax on {}", table);
+				try (PreparedStatement ps = connection.prepareStatement(addMaxSql)) {
+					ps.execute();
+				}
+
+				logger.info("Partition {} added successfully to {}", nextPartitionName, table);
+			}
+		} catch (SQLException e) {
+			logger.error("SQL error when adding partition", e);
 		}
 	}
 

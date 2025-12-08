@@ -33,4 +33,6 @@ public class GlobalVar {
 		}
 		return new SimpleDateFormat("yyMMddHHmmssSSS").format(new Date()) + "" + INCREMNT_NUMBER;
 	}
+	
+	
 }

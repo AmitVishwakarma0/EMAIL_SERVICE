@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -33,6 +35,8 @@ import com.hti.entity.EmailEntry;
 import com.hti.entity.EmailEntry.BatchStatus;
 import com.hti.exception.InvalidRequestException;
 import com.hti.exception.ProcessingException;
+import com.hti.model.DeliverResponse;
+import com.hti.service.SingletonService;
 import com.hti.entity.RecipientsEntry;
 import com.hti.entity.ReportEntry;
 import com.hti.entity.SmtpEntry;
@@ -51,7 +55,6 @@ public class EmailProcessor implements Runnable {
 	private boolean stop;
 	private List<RecipientsEntry> pendingRecipients;
 	private String systemId;
-	private Queue reportQueue;
 	private ReportService reportService;
 	private Queue updateQueue;
 	private RecipientEntryService recipientEntryService;
@@ -60,6 +63,7 @@ public class EmailProcessor implements Runnable {
 	private Set<File> attachments;
 	private Set<String> ccRecipients;
 	private Set<String> bccRecipients;
+	private DlrForwarder dlrForwarder;
 
 	public EmailProcessor(EmailEntry entry) throws InvalidRequestException {
 		logger.info(entry.getBatchId() + " Batch Initializing For " + entry.getSystemId() + " Total Recipients: "
@@ -70,10 +74,10 @@ public class EmailProcessor implements Runnable {
 		this.entry = entry;
 		this.service = new DBService();
 		loadSmtpConfiguration();
-		this.reportQueue = new Queue();
 		this.updateQueue = new Queue();
 		this.recipientEntryService = new RecipientEntryService(systemId, batchId, updateQueue);
-		this.reportService = new ReportService(systemId, reportQueue);
+		this.reportService = SingletonService.getUserReportService(systemId);
+		this.dlrForwarder = SingletonService.getUserDlrForwarder(systemId);
 		new Thread(this, "Batch_" + systemId + "_" + batchId).start();
 	}
 
@@ -90,14 +94,16 @@ public class EmailProcessor implements Runnable {
 		smtpProps.put("mail.transport.protocol", "smtp");
 		smtpProps.put("mail.smtp.port", smtpEntry.getPort());
 		smtpProps.put("mail.smtp.auth", "true");
-		if (smtpEntry.getEncryptionType() == SmtpEntry.EncryptionType.STARTTLS) {
-			smtpProps.put("mail.smtp.starttls.enable", "true");
-		} else if (smtpEntry.getEncryptionType() == SmtpEntry.EncryptionType.SSL) {
+		switch (smtpEntry.getEncryptionType()) {
+		case STARTTLS -> smtpProps.put("mail.smtp.starttls.enable", "true");
+		case SSL -> {
 			smtpProps.put("mail.smtp.ssl.enable", "true");
 			smtpProps.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-		} else if (smtpEntry.getEncryptionType() == SmtpEntry.EncryptionType.NONE) {
+		}
+		case NONE -> {
 			smtpProps.put("mail.smtp.starttls.enable", "false");
 			smtpProps.put("mail.smtp.ssl.enable", "false");
+		}
 		}
 	}
 
@@ -194,9 +200,16 @@ public class EmailProcessor implements Runnable {
 						// put to delete queue
 						updateQueue.enqueue(recipientsEntry);
 						// put to report queue
-						reportQueue.enqueue(new ReportEntry(recipientsEntry.getMsgId(), batchId,
+						reportService.submit(new ReportEntry(recipientsEntry.getMsgId(), batchId,
 								recipientsEntry.getRecipient(), status.toString(), statusCode, response,
 								entry.getCreatedOn(), new Timestamp(System.currentTimeMillis())));
+						if (smtpEntry.getWebhookUrl() != null) {
+							dlrForwarder.submit(new DeliverResponse(batchId, recipientsEntry.getMsgId(),
+									smtpEntry.getId(), entry.getSubject(), recipientsEntry.getRecipient(),
+									status.toString(), new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()),
+									smtpEntry.getWebhookUrl()));
+						}
+
 						itr.remove(); // remove the local entry
 						if (stop || reconnect) {
 							break;
@@ -305,7 +318,6 @@ public class EmailProcessor implements Runnable {
 		}
 		service.updateBatchStatus(systemId, batchId, entry.getBatchStatus().toString());
 		recipientEntryService.stop(drop);
-		reportService.stop();
 	}
 
 	private boolean isValidEmail(String email) {
@@ -365,6 +377,11 @@ public class EmailProcessor implements Runnable {
 	public void stop(BatchStatus status) {
 		logger.info(batchId + " Batch Process Stopping For " + systemId);
 		entry.setBatchStatus(status);
+		stop = true;
+	}
+
+	public void stop() {
+		logger.info(batchId + " Batch Process Stopping For " + systemId);
 		stop = true;
 	}
 

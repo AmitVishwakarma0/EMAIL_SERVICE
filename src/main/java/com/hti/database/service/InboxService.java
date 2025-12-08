@@ -5,6 +5,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -16,23 +17,26 @@ import com.hti.service.SingletonService;
 import com.hti.util.GlobalVar;
 import com.hti.util.Queue;
 
-public class ReportService implements Runnable {
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
-	private Logger logger = LoggerFactory.getLogger("dbLogger");
+public class InboxService implements Runnable {
+
+	private Logger logger = LoggerFactory.getLogger(InboxService.class);
 	private boolean stop;
 	private Queue processQueue;
 	private String systemId;
 	private String table_name = null;
 	private long lastActiveTime;
-    private static final long IDLE_TIMEOUT = 600_000; // 10 minutes
+	private static final long IDLE_TIMEOUT = 600_000; // 10 minutes
 
-	public ReportService(String systemId) {
-		logger.info(systemId + "_report thread starting");
+	public InboxService(String systemId) {
+		logger.info(systemId + "_InboxInsert thread starting");
 		this.systemId = systemId;
 		this.processQueue = new Queue();
 		this.lastActiveTime = System.currentTimeMillis(); // reset idle timer
-		this.table_name = "report_" + systemId;
-		new Thread(this, systemId + "_ReportInsert").start();
+		this.table_name = "inbox_" + systemId;
+		new Thread(this, systemId + "_InboxInsert").start();
 	}
 
 	public void submit(ReportEntry entry) {
@@ -46,39 +50,39 @@ public class ReportService implements Runnable {
 			if (processQueue.isEmpty()) {
 				long idleFor = System.currentTimeMillis() - lastActiveTime;
 
-                if (idleFor > IDLE_TIMEOUT) {
-                    logger.info(systemId + "_ReportInsert Idle timeout. Auto-stopping.");
-                    SingletonService.removeUserReportService(systemId); // remove from cache
-                    break;
-                }
+				if (idleFor > IDLE_TIMEOUT) {
+					logger.info(systemId + "_InboxInsert Idle timeout. Auto-stopping.");
+					SingletonService.removeUserInboxService(systemId); // remove from cache
+					break;
+				}
 				try {
-					Thread.sleep(GlobalVar.QUEUE_WAIT_TIME);
+					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 				}
 				continue;
 			}
 			lastActiveTime = System.currentTimeMillis();
 			logger.info("processQueue: " + processQueue.size());
-			ReportEntry entry = null;
+			InboxEntry entry = null;
 			try (Connection connection = GlobalVar.connectionPool.getConnection();
-					PreparedStatement statement = connection.prepareStatement("INSERT INTO " + table_name
-							+ " (msg_id, batch_id, recipient, received_on, submit_on, status, status_code, remarks) "
+					PreparedStatement statement = connection.prepareStatement("INSERT IGNORE INTO " + table_name
+							+ " (msg_id, smtp_id, email_user, from_email, subject, body, attachments, received_on) "
 							+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
 
 				connection.setAutoCommit(false);
 				int count = 0;
 
 				while (!processQueue.isEmpty()) {
-					entry = (ReportEntry) processQueue.dequeue();
+					entry = (InboxEntry) processQueue.dequeue();
 
-					statement.setString(1, entry.getMsgId());
-					statement.setString(2, entry.getBatchId());
-					statement.setString(3, entry.getRecipient());
-					statement.setTimestamp(4, entry.getReceivedOn());
-					statement.setTimestamp(5, entry.getSubmitOn());
-					statement.setString(6, entry.getStatus());
-					statement.setInt(7, entry.getStatusCode());
-					statement.setString(8, entry.getRemarks());
+					statement.setString(1, entry.getMessageId());
+					statement.setInt(2, entry.getSmtpId());
+					statement.setString(3, entry.getEmailUser());
+					statement.setString(4, entry.getFrom());
+					statement.setString(5, entry.getSubject());
+					statement.setString(6, entry.getBody());
+					statement.setString(7, entry.getAttachments());
+					statement.setTimestamp(8, entry.getReceivedOn());
 					statement.addBatch();
 					if (++count > GlobalVar.JDBC_BATCH_SIZE) {
 						break;
@@ -98,11 +102,11 @@ public class ReportService implements Runnable {
 			}
 
 		}
-		logger.info(systemId + "_ReportInsert Stopped.Queue:" + processQueue.size());
+		logger.info(systemId + "_InboxInsert Stopped.Queue:" + processQueue.size());
 	}
 
 	public void stop() {
-		logger.info(systemId + "_ReportInsert Stopping.Queue:" + processQueue.size());
+		logger.info(systemId + "_InboxInsert Stopping.Queue:" + processQueue.size());
 		stop = true;
 	}
 
@@ -110,7 +114,6 @@ public class ReportService implements Runnable {
 		boolean tableExists = false;
 
 		try (Connection connection = GlobalVar.connectionPool.getConnection()) {
-
 			DatabaseMetaData meta = connection.getMetaData();
 			try (ResultSet rs = meta.getTables(null, null, table_name, null)) {
 				if (rs.next()) {
@@ -142,15 +145,14 @@ public class ReportService implements Runnable {
 
 	private String buildCreateTableQuery() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("CREATE TABLE IF NOT EXISTS ").append(table_name).append("(").append("msg_id bigint NOT NULL, \n")
-				.append("batch_id bigint DEFAULT 0, \n").append("recipient varchar(50) DEFAULT NULL, \n")
-				.append("status varchar(12) DEFAULT NULL, \n").append("status_code int(3) DEFAULT 0, \n")
-				.append("received_on timestamp NULL DEFAULT CURRENT_TIMESTAMP, \n")
-				.append("submit_on timestamp NULL DEFAULT CURRENT_TIMESTAMP, \n")
-				.append("remarks varchar(100) DEFAULT NULL, \n")
-				.append("partition_id INT GENERATED ALWAYS AS (CAST(LEFT(msg_id, 6) AS UNSIGNED)) STORED, \n")
-				.append("PRIMARY KEY (msg_id, partition_id)")
-				.append(")\nENGINE=InnoDB\nPARTITION BY RANGE (partition_id) (\n");
+		sb.append("CREATE TABLE IF NOT EXISTS ").append(table_name).append("(").append("id BIGINT AUTO_INCREMENT, \n")
+				.append("msg_id VARCHAR(100) NOT NULL, \n").append("smtp_id INT DEFAULT 0, \n")
+				.append("email_user VARCHAR(50) DEFAULT NULL, \n").append("from_email VARCHAR(50) DEFAULT NULL, \n")
+				.append("subject TEXT, \n").append("body TEXT, \n").append("attachments TEXT, \n")
+				.append("received_on TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, \n")
+				.append("partition_id INT GENERATED ALWAYS AS (CAST(DATE_FORMAT(received_on, '%y%m%d') AS UNSIGNED)) STORED, \n")
+				.append("PRIMARY KEY (id, partition_id), \n").append("UNIQUE KEY uk_msg_id (msg_id, partition_id)\n")
+				.append(") ENGINE=InnoDB\nPARTITION BY RANGE (partition_id) (\n");
 
 		// previous partitions
 		for (int i = 2; i > 0; i--) {
@@ -174,6 +176,26 @@ public class ReportService implements Runnable {
 		String sql = sb.toString();
 		logger.info(sql);
 		return sql;
+	}
+
+	public void insertEmail(int smtpId, String emailUser, String messageId, String from, String subject, String body,
+			Timestamp timestamp, String jsonFileNames) {
+		processQueue
+				.enqueue(new InboxEntry(smtpId, emailUser, messageId, from, subject, body, timestamp, jsonFileNames));
+
+	}
+
+	@Data
+	@AllArgsConstructor
+	private class InboxEntry {
+		private int smtpId;
+		private String emailUser;
+		private String messageId;
+		private String from;
+		private String subject;
+		private String body;
+		private Timestamp receivedOn;
+		String attachments;
 	}
 
 }

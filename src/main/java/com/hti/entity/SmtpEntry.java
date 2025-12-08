@@ -11,12 +11,16 @@ public class SmtpEntry {
 	private String host;
 
 	private int port;
-
+	
 	private String emailUser;
 
 	private String emailPassword;
 	
 	private boolean verified;
+	
+	private boolean readInbox;
+	
+	private String webhookUrl;
 
 	private EncryptionType encryptionType;
 
