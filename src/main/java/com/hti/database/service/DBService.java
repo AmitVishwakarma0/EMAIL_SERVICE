@@ -41,12 +41,10 @@ public class DBService {
 	public SmtpEntry getSmtpEntry(String systemId, int smtpId) {
 		String sql = "SELECT * FROM smtp_config WHERE id = ? and system_id = ?";
 		try (Connection con = GlobalVar.connectionPool.getConnection();
-				PreparedStatement stmt = con.prepareStatement(sql)) {
-
+			PreparedStatement stmt = con.prepareStatement(sql)) {
 			stmt.setInt(1, smtpId);
 			stmt.setString(2, systemId);
 			ResultSet rs = stmt.executeQuery();
-
 			if (rs.next()) {
 				SmtpEntry entry = new SmtpEntry();
 				entry.setId(rs.getInt("id"));
