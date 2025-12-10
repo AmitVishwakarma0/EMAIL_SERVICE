@@ -290,17 +290,15 @@ public class EmailProcessor implements Runnable {
 	private void listAttachments() {
 		attachments = new HashSet<>();
 		if (entry.getAttachments() != null && !entry.getAttachments().isEmpty()) {
-			String attachmentDir = GlobalVar.ATTACHMENT_DIR + File.separator + systemId.toLowerCase() + File.separator
-					+ batchId;
 			JSONArray attachmentArray = new JSONArray(entry.getAttachments());
 			for (int i = 0; i < attachmentArray.length(); i++) {
-				String filename = attachmentArray.getString(i).trim();
-				File file = new File(attachmentDir, filename);
+				String filepath = attachmentArray.getString(i).trim();
+				File file = new File(filepath);
 				if (file.exists()) {
 					attachments.add(file);
-					logger.info(batchId + ": " + filename + " added as attachment.");
+					logger.info(batchId + ": " + filepath + " added as attachment.");
 				} else {
-					logger.warn(batchId + ": " + filename + " does not exist in attachment directory.");
+					logger.warn(batchId + ": " + filepath + " does not exist.");
 				}
 			}
 		}

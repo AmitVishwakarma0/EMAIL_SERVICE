@@ -3,6 +3,7 @@ package com.hti.util;
 import com.hazelcast.core.HazelcastInstance;
 import com.hti.database.ConnectionPool;
 import com.hti.process.EmailProcessor;
+import com.hti.process.ImapIdleListener;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -26,6 +27,7 @@ public class GlobalVar {
 	public static HazelcastInstance hazelInstance;
 	public static ConnectionPool connectionPool;
 	public static Map<String, Map<String, EmailProcessor>> processingMap = new ConcurrentHashMap<String, Map<String, EmailProcessor>>();
+	public static Map<String, ImapIdleListener> ImapListenerMap = new ConcurrentHashMap<String, ImapIdleListener>();
 
 	public static synchronized String assignMessageId() {
 		if (++INCREMNT_NUMBER > 9999) {
@@ -33,6 +35,5 @@ public class GlobalVar {
 		}
 		return new SimpleDateFormat("yyMMddHHmmssSSS").format(new Date()) + "" + INCREMNT_NUMBER;
 	}
-	
-	
+
 }

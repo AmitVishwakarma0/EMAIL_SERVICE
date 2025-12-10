@@ -25,10 +25,12 @@ import com.hazelcast.topic.ITopic;
 import com.hti.database.ConnectionPool;
 import com.hti.database.service.DBService;
 import com.hti.entity.EmailEntry;
+import com.hti.entity.ImapEntry;
 import com.hti.entity.RecipientsEntry;
 import com.hti.exception.InvalidRequestException;
 import com.hti.listener.FlagEventListener;
 import com.hti.process.EmailProcessor;
+import com.hti.process.ImapIdleListener;
 import com.hti.process.SchedulerManager;
 import com.hti.service.SingletonService;
 import com.hti.util.FileUtil;
@@ -62,10 +64,12 @@ public class ServiceController implements Runnable {
 		exec.submit(() -> {
 			try {
 				loadPendingEntriesAsync();
+				startImapListeners();
 			} finally {
 				exec.shutdown();
 			}
 		});
+
 		new Thread(this, "Monitor").start();
 	}
 
@@ -211,8 +215,34 @@ public class ServiceController implements Runnable {
 	}
 
 	private void stopProcess() {
+		stopImapListeners();
 		stopRunningBatches();
 		SingletonService.clear();
+	}
+
+	private void stopImapListeners() {
+		logger.info("<--- Stopping Imap Listeners Services -->");
+		try {
+			GlobalVar.ImapListenerMap.forEach((k, v) -> {
+				v.stop();
+			});
+		} catch (Exception e) {
+			logger.error("", e);
+		}
+
+	}
+
+	private void startImapListeners() {
+		logger.info("Starting Imap Listeners");
+		List<ImapEntry> list = new DBService().listImapEntries();
+		if (list.isEmpty()) {
+			logger.info("No Imap Configuration Found.");
+		}
+		for (ImapEntry entry : list) {
+			String keyname = entry.getSystemId() + "_" + entry.getId();
+			GlobalVar.ImapListenerMap.put(keyname, new ImapIdleListener(entry));
+		}
+		logger.info("End Imap Listeners");
 	}
 
 	private void stopRunningBatches() {

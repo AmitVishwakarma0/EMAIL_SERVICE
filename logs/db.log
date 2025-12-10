@@ -1,0 +1,48 @@
+2025-12-10 12:37:48:086 [http-nio-8080-exec-4] - recipient_super_2512101237479641001_RecipientEntryService thread starting
+2025-12-10 12:37:48:090 [http-nio-8080-exec-4] - super_report thread starting
+2025-12-10 12:37:48:096 [super_ReportInsert] - report_super already exists. No need to create.
+2025-12-10 12:37:55:751 [super_ReportInsert] - processQueue: 1
+2025-12-10 12:37:55:751 [recipient_super_2512101237479641001_RecipientEntryService] - processQueue: 1
+2025-12-10 12:37:55:759 [super_ReportInsert] - Executed: 1
+2025-12-10 12:37:55:759 [recipient_super_2512101237479641001_RecipientEntryService] - Executed: 1
+2025-12-10 12:38:01:986 [super_ReportInsert] - processQueue: 1
+2025-12-10 12:38:01:986 [recipient_super_2512101237479641001_RecipientEntryService] - processQueue: 1
+2025-12-10 12:38:01:990 [super_ReportInsert] - Executed: 1
+2025-12-10 12:38:01:992 [recipient_super_2512101237479641001_RecipientEntryService] - Executed: 1
+2025-12-10 12:38:04:189 [Batch_super_2512101237479641001] - recipient_super_2512101237479641001_RecipientEntryService Stopping.Queue:0
+2025-12-10 12:38:04:286 [recipient_super_2512101237479641001_RecipientEntryService] - recipient_super_2512101237479641001 Drop Command Received
+2025-12-10 12:38:04:300 [recipient_super_2512101237479641001_RecipientEntryService] - recipient_super_2512101237479641001 Table Drop Success.
+2025-12-10 12:38:04:300 [recipient_super_2512101237479641001_RecipientEntryService] - recipient_super_2512101237479641001_RecipientEntryService Stopped.Queue:0
+2025-12-10 12:48:01:988 [super_ReportInsert] - super_ReportInsert Idle timeout. Auto-stopping.
+2025-12-10 12:48:01:988 [super_ReportInsert] - super_ReportInsert Stopping.Queue:0
+2025-12-10 12:48:01:988 [super_ReportInsert] - super_ReportInsert Stopped.Queue:0
+2025-12-10 12:51:36:556 [http-nio-8080-exec-1] - recipient_super_2512101251364831001_RecipientEntryService thread starting
+2025-12-10 12:51:36:558 [http-nio-8080-exec-1] - super_report thread starting
+2025-12-10 12:51:36:562 [super_ReportInsert] - report_super already exists. No need to create.
+2025-12-10 12:51:43:788 [recipient_super_2512101251364831001_RecipientEntryService] - processQueue: 1
+2025-12-10 12:51:43:789 [super_ReportInsert] - processQueue: 1
+2025-12-10 12:51:43:792 [recipient_super_2512101251364831001_RecipientEntryService] - Executed: 1
+2025-12-10 12:51:43:799 [super_ReportInsert] - Executed: 1
+2025-12-10 12:51:48:789 [recipient_super_2512101251364831001_RecipientEntryService] - processQueue: 1
+2025-12-10 12:51:48:792 [recipient_super_2512101251364831001_RecipientEntryService] - Executed: 1
+2025-12-10 12:51:48:804 [super_ReportInsert] - processQueue: 1
+2025-12-10 12:51:48:813 [super_ReportInsert] - Executed: 1
+2025-12-10 12:51:50:775 [Batch_super_2512101251364831001] - recipient_super_2512101251364831001_RecipientEntryService Stopping.Queue:0
+2025-12-10 12:51:50:858 [recipient_super_2512101251364831001_RecipientEntryService] - recipient_super_2512101251364831001 Drop Command Received
+2025-12-10 12:51:50:868 [recipient_super_2512101251364831001_RecipientEntryService] - recipient_super_2512101251364831001 Table Drop Success.
+2025-12-10 12:51:50:868 [recipient_super_2512101251364831001_RecipientEntryService] - recipient_super_2512101251364831001_RecipientEntryService Stopped.Queue:0
+2025-12-10 13:21:55:227 [http-nio-8080-exec-1] - recipient_super_2512101321551611001_RecipientEntryService thread starting
+2025-12-10 13:21:55:228 [http-nio-8080-exec-1] - super_report thread starting
+2025-12-10 13:21:55:233 [super_ReportInsert] - report_super already exists. No need to create.
+2025-12-10 13:22:03:485 [recipient_super_2512101321551611001_RecipientEntryService] - processQueue: 1
+2025-12-10 13:22:03:490 [recipient_super_2512101321551611001_RecipientEntryService] - Executed: 1
+2025-12-10 13:22:03:491 [super_ReportInsert] - processQueue: 1
+2025-12-10 13:22:03:498 [super_ReportInsert] - Executed: 1
+2025-12-10 13:22:08:637 [super_ReportInsert] - processQueue: 1
+2025-12-10 13:22:08:639 [recipient_super_2512101321551611001_RecipientEntryService] - processQueue: 1
+2025-12-10 13:22:08:650 [recipient_super_2512101321551611001_RecipientEntryService] - Executed: 1
+2025-12-10 13:22:08:652 [super_ReportInsert] - Executed: 1
+2025-12-10 13:22:10:449 [Batch_super_2512101321551611001] - recipient_super_2512101321551611001_RecipientEntryService Stopping.Queue:0
+2025-12-10 13:22:10:490 [recipient_super_2512101321551611001_RecipientEntryService] - recipient_super_2512101321551611001 Drop Command Received
+2025-12-10 13:22:10:500 [recipient_super_2512101321551611001_RecipientEntryService] - recipient_super_2512101321551611001 Table Drop Success.
+2025-12-10 13:22:10:501 [recipient_super_2512101321551611001_RecipientEntryService] - recipient_super_2512101321551611001_RecipientEntryService Stopped.Queue:0

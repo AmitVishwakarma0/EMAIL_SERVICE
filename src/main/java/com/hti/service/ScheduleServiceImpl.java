@@ -113,21 +113,20 @@ public class ScheduleServiceImpl implements ScheduleService {
 			List<MultipartFile> attachmentList = new ArrayList<MultipartFile>();
 			if (entry.getAttachments() != null && !entry.getAttachments().isEmpty()) {
 				JSONArray attachmentArray = new JSONArray(entry.getAttachments());
-				String attachmentDir = GlobalVar.ATTACHMENT_DIR + File.separator + entry.getSystemId().toLowerCase()
-						+ File.separator + entry.getBatchId();
+
 				for (int i = 0; i < attachmentArray.length(); i++) {
-					String filename = attachmentArray.getString(i).trim();
-					File file = new File(attachmentDir, filename);
+					String filepath = attachmentArray.getString(i).trim();
+					File file = new File(filepath);
 					if (file.exists()) {
 						try {
 							MultipartFile multipartFile = new DiskMultipartFile(file);
 							attachmentList.add(multipartFile);
-							logger.info(entry.getBatchId() + ": " + filename + " found as attachment.");
+							logger.info(entry.getBatchId() + ": " + filepath + " found as attachment.");
 						} catch (IOException e) {
-							logger.error(entry.getBatchId() + " " + filename, e);
+							logger.error(entry.getBatchId() + " " + filepath, e);
 						}
 					} else {
-						logger.warn(entry.getBatchId() + ": " + filename + " does not exist in attachment directory.");
+						logger.warn(entry.getBatchId() + ": " + filepath + " does not exist.");
 					}
 				}
 			}
@@ -146,17 +145,17 @@ public class ScheduleServiceImpl implements ScheduleService {
 		List<MultipartFile> attachmentList = request.getAttachmentList();
 		if (attachmentList != null) {
 			JsonArray json = new JsonArray();
-			String attachmentDir = System.getProperty("user.dir") + File.separator + GlobalVar.ATTACHMENT_DIR
-					+ File.separator + systemId.toLowerCase() + File.separator + batchId;
+			String attachmentDir = GlobalVar.ATTACHMENT_DIR + File.separator + systemId.toLowerCase() + File.separator
+					+ "batch" + File.separator + batchId + File.separator;
 			System.out.println("attachmentDir: " + attachmentDir);
-			File dir = new File(attachmentDir);
+			File dir = new File(System.getProperty("user.dir") + File.separator + attachmentDir);
 			if (!dir.exists()) {
 				dir.mkdirs(); // create directories
 			}
 			for (MultipartFile file : attachmentList) {
 				String filename = writeToFile(file, dir);
 				if (filename != null) {
-					json.add(filename); // add filename to JSON array
+					json.add(attachmentDir + filename); // add filename to JSON array
 					logger.info(systemId + "[" + batchId + "]: " + filename + " Added As Attachment.");
 				}
 			}

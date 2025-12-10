@@ -66,8 +66,8 @@ public class InboxService implements Runnable {
 			InboxEntry entry = null;
 			try (Connection connection = GlobalVar.connectionPool.getConnection();
 					PreparedStatement statement = connection.prepareStatement("INSERT IGNORE INTO " + table_name
-							+ " (msg_id, smtp_id, email_user, from_email, subject, body, attachments, received_on) "
-							+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+							+ " (msg_id, smtp_id,uid, email_user, from_email, subject, body, attachments, received_on) "
+							+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
 
 				connection.setAutoCommit(false);
 				int count = 0;
@@ -77,12 +77,13 @@ public class InboxService implements Runnable {
 
 					statement.setString(1, entry.getMessageId());
 					statement.setInt(2, entry.getSmtpId());
-					statement.setString(3, entry.getEmailUser());
-					statement.setString(4, entry.getFrom());
-					statement.setString(5, entry.getSubject());
-					statement.setString(6, entry.getBody());
-					statement.setString(7, entry.getAttachments());
-					statement.setTimestamp(8, entry.getReceivedOn());
+					statement.setLong(3, entry.getUid());
+					statement.setString(4, entry.getEmailUser());
+					statement.setString(5, entry.getFrom());
+					statement.setString(6, entry.getSubject());
+					statement.setString(7, entry.getBody());
+					statement.setString(8, entry.getAttachments());
+					statement.setTimestamp(9, entry.getReceivedOn());
 					statement.addBatch();
 					if (++count > GlobalVar.JDBC_BATCH_SIZE) {
 						break;
@@ -145,14 +146,15 @@ public class InboxService implements Runnable {
 
 	private String buildCreateTableQuery() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("CREATE TABLE IF NOT EXISTS ").append(table_name).append("(").append("id BIGINT AUTO_INCREMENT, \n")
+		sb.append("CREATE TABLE IF NOT EXISTS ").append(table_name).append(" (").append("id BIGINT AUTO_INCREMENT, \n")
 				.append("msg_id VARCHAR(100) NOT NULL, \n").append("smtp_id INT DEFAULT 0, \n")
-				.append("email_user VARCHAR(50) DEFAULT NULL, \n").append("from_email VARCHAR(50) DEFAULT NULL, \n")
-				.append("subject TEXT, \n").append("body TEXT, \n").append("attachments TEXT, \n")
-				.append("received_on TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, \n")
+				.append("uid BIGINT DEFAULT 0, \n").append("email_user VARCHAR(50) DEFAULT NULL, \n")
+				.append("from_email VARCHAR(50) DEFAULT NULL, \n").append("subject TEXT, \n").append("body TEXT, \n")
+				.append("attachments TEXT, \n").append("received_on TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, \n")
 				.append("partition_id INT GENERATED ALWAYS AS (CAST(DATE_FORMAT(received_on, '%y%m%d') AS UNSIGNED)) STORED, \n")
-				.append("PRIMARY KEY (id, partition_id), \n").append("UNIQUE KEY uk_msg_id (msg_id, partition_id)\n")
-				.append(") ENGINE=InnoDB\nPARTITION BY RANGE (partition_id) (\n");
+				.append("PRIMARY KEY (id, partition_id), \n")
+				.append("UNIQUE KEY uk_smtp_uid (smtp_id, uid, partition_id)\n").append(") ENGINE=InnoDB\n")
+				.append("PARTITION BY RANGE (partition_id) (\n");
 
 		// previous partitions
 		for (int i = 2; i > 0; i--) {
@@ -178,17 +180,39 @@ public class InboxService implements Runnable {
 		return sql;
 	}
 
-	public void insertEmail(int smtpId, String emailUser, String messageId, String from, String subject, String body,
-			Timestamp timestamp, String jsonFileNames) {
-		processQueue
-				.enqueue(new InboxEntry(smtpId, emailUser, messageId, from, subject, body, timestamp, jsonFileNames));
+	public void insertEmail(int smtpId, long uid, String emailUser, String messageId, String from, String subject,
+			String body, Timestamp timestamp, String jsonFileNames) {
+		processQueue.enqueue(
+				new InboxEntry(smtpId, uid, emailUser, messageId, from, subject, body, timestamp, jsonFileNames));
 
+	}
+
+	public long getLastUid(int smtpId) {
+		long lastUid = 0;
+		String sql = "SELECT uid FROM " + table_name + " WHERE smtp_id = ? " + " ORDER BY received_on DESC LIMIT 1";
+		try (Connection conn = GlobalVar.connectionPool.getConnection();
+				PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setInt(1, smtpId);
+
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) {
+					lastUid = rs.getLong(1);
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error(table_name + " error reading lastUid", e);
+		}
+
+		return lastUid;
 	}
 
 	@Data
 	@AllArgsConstructor
 	private class InboxEntry {
 		private int smtpId;
+		private long uid;
 		private String emailUser;
 		private String messageId;
 		private String from;
