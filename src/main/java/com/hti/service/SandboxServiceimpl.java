@@ -1,6 +1,7 @@
 package com.hti.service;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
@@ -39,15 +40,18 @@ import com.sun.mail.smtp.SMTPTransport;
 public class SandboxServiceimpl implements SandboxService {
 
 	private Logger logger = LoggerFactory.getLogger(SandboxServiceimpl.class);
-	private DBService dbService = new DBService();
 
 	@Override
 	public String sendEmail(SandBoxEmailRequest request, String ipAddress, String systemId) {
 
 		logger.info(systemId + "[" + ipAddress + "] Sandbox Request: " + request.toString());
-		SmtpEntry smtpEntry = dbService.getSmtpEntry(systemId, request.getSmtpId());
+		Map<Integer, SmtpEntry> inner = GlobalVar.SmtpEntries.get(systemId);
+		if (inner == null) {
+			throw new InvalidRequestException("SMTP configuration missing for systemId: " + systemId);
+		}
+		SmtpEntry smtpEntry = inner.get(request.getSmtpId());
 		if (smtpEntry == null) {
-			throw new InvalidRequestException("SMTP configuration missing for system: " + systemId);
+			throw new InvalidRequestException("SMTP configuration missing for smtpId: " + request.getSmtpId());
 		}
 		String msgId = GlobalVar.assignMessageId();
 		Session mailSession = Session.getInstance(getSmtpProperties(smtpEntry), new javax.mail.Authenticator() {
@@ -60,11 +64,13 @@ public class SandboxServiceimpl implements SandboxService {
 		SMTPTransport transport = null;
 		EmailStatus status = EmailStatus.PENDING;
 		String response = null;
-
+		logger.info(systemId + " Trying To Connect [" + smtpEntry.getEmailUser() + "] @" + smtpEntry.getHost() + ":"
+				+ smtpEntry.getPort());
 		try {
 			transport = (SMTPTransport) mailSession.getTransport("smtp");
 			transport.connect();
-
+			logger.info(systemId + " Connected [" + smtpEntry.getEmailUser() + "] @" + smtpEntry.getHost() + ":"
+					+ smtpEntry.getPort());
 			Message message = prepareMessage(mailSession, request, smtpEntry, msgId);
 
 			logger.info("[{}] Sending Email To: {}", msgId, request.getRecipient());
@@ -80,17 +86,17 @@ public class SandboxServiceimpl implements SandboxService {
 		} catch (SendFailedException e) {
 			status = EmailStatus.FAILED;
 			logger.error("[{}] Send failed for recipient {}", msgId, request.getRecipient(), e);
-			throw new ProcessingException(e.getMessage());
+			throw new ProcessingException(e.getLocalizedMessage());
 
 		} catch (MessagingException e) {
 			status = EmailStatus.ERROR;
 			logger.error("[{}] Messaging exception {}", msgId, request.getRecipient(), e);
-			throw new ProcessingException(e.getMessage());
+			throw new ProcessingException(e.getLocalizedMessage());
 
 		} catch (Exception e) {
 			status = EmailStatus.ERROR;
 			logger.error("[{}] Unexpected exception {}", msgId, request.getRecipient(), e);
-			throw new ProcessingException(e.getMessage());
+			throw new ProcessingException(e.getLocalizedMessage());
 
 		} finally {
 			if (transport != null) {
@@ -101,7 +107,7 @@ public class SandboxServiceimpl implements SandboxService {
 			}
 		}
 		if (status == EmailStatus.DELIVERED) {
-			dbService.updateSmtpStatus(request.getSmtpId());
+			GlobalVar.eventService.setSmtpVerified(systemId, request.getSmtpId());
 		}
 
 		return status.name();
@@ -146,7 +152,7 @@ public class SandboxServiceimpl implements SandboxService {
 		props.put("mail.smtp.port", smtpEntry.getPort());
 		props.put("mail.transport.protocol", "smtp");
 		props.put("mail.smtp.auth", "true");
-
+		props.put("mail.debug", "true");
 		switch (smtpEntry.getEncryptionType()) {
 		case STARTTLS -> props.put("mail.smtp.starttls.enable", "true");
 		case SSL -> {

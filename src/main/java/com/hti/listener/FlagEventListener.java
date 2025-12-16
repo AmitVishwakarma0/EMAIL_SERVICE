@@ -30,32 +30,17 @@ public class FlagEventListener implements MessageListener<Map<String, String>> {
 
 		case "SMTP_ADD":
 			logger.info(systemId + " smtp config {} added .", smtpId);
+			GlobalVar.eventService.handleSmtpAdd(systemId, smtpId);
 			break;
 
 		case "SMTP_UPDATE":
-			Map<String, EmailProcessor> inner = GlobalVar.processingMap.get(systemId);
-			if (inner == null) {
-				logger.info(systemId + " No Running Batches.");
-			} else {
-				for (EmailProcessor processor : inner.values()) {
-					String batchId = processor.getBatchId();
-					if (processor.getSmtpEntry().getId() == smtpId) {
-						logger.info(systemId + " Running Batch {} Found To Update Smtp Configuration {}", batchId,
-								smtpId);
-						try {
-							processor.reloadSmtpConfiguration();
-						} catch (InvalidRequestException e) {
-							logger.error(systemId + " " + batchId, e.getMessage());
-						}
-					}
-				}
-
-			}
-
+			logger.info(systemId + " smtp config {} updated .", smtpId);
+			GlobalVar.eventService.handleSmtpUpdate(systemId, smtpId);
 			break;
 
 		case "SMTP_DELETE":
 			logger.info(systemId + " smtp config {} deleted .", smtpId);
+			GlobalVar.eventService.handleSmtpRemove(systemId, smtpId);
 			break;
 
 		default:

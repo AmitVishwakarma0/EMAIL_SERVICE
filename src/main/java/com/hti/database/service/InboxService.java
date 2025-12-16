@@ -27,14 +27,14 @@ public class InboxService implements Runnable {
 	private Queue processQueue;
 	private String systemId;
 	private String table_name = null;
-	private long lastActiveTime;
-	private static final long IDLE_TIMEOUT = 600_000; // 10 minutes
+	// private long lastActiveTime;
+	// private static final long IDLE_TIMEOUT = 600_000; // 10 minutes
 
 	public InboxService(String systemId) {
 		logger.info(systemId + "_InboxInsert thread starting");
 		this.systemId = systemId;
 		this.processQueue = new Queue();
-		this.lastActiveTime = System.currentTimeMillis(); // reset idle timer
+		// this.lastActiveTime = System.currentTimeMillis(); // reset idle timer
 		this.table_name = "inbox_" + systemId;
 		new Thread(this, systemId + "_InboxInsert").start();
 	}
@@ -48,20 +48,20 @@ public class InboxService implements Runnable {
 		checkTable();
 		while (!stop) {
 			if (processQueue.isEmpty()) {
-				long idleFor = System.currentTimeMillis() - lastActiveTime;
-
-				if (idleFor > IDLE_TIMEOUT) {
-					logger.info(systemId + "_InboxInsert Idle timeout. Auto-stopping.");
-					SingletonService.removeUserInboxService(systemId); // remove from cache
-					break;
-				}
+				/*
+				 * long idleFor = System.currentTimeMillis() - lastActiveTime; if (idleFor >
+				 * IDLE_TIMEOUT) { logger.info(systemId +
+				 * "_InboxInsert Idle timeout. Auto-stopping.");
+				 * SingletonService.removeUserInboxService(systemId); // remove from cache
+				 * break; }
+				 */
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 				}
 				continue;
 			}
-			lastActiveTime = System.currentTimeMillis();
+			// lastActiveTime = System.currentTimeMillis();
 			logger.info("processQueue: " + processQueue.size());
 			InboxEntry entry = null;
 			try (Connection connection = GlobalVar.connectionPool.getConnection();

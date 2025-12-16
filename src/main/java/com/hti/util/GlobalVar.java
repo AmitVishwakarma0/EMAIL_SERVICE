@@ -2,8 +2,11 @@ package com.hti.util;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hti.database.ConnectionPool;
+import com.hti.entity.ImapEntry;
+import com.hti.entity.SmtpEntry;
 import com.hti.process.EmailProcessor;
 import com.hti.process.ImapIdleListener;
+import com.hti.service.EventService;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -28,6 +31,9 @@ public class GlobalVar {
 	public static ConnectionPool connectionPool;
 	public static Map<String, Map<String, EmailProcessor>> processingMap = new ConcurrentHashMap<String, Map<String, EmailProcessor>>();
 	public static Map<String, ImapIdleListener> ImapListenerMap = new ConcurrentHashMap<String, ImapIdleListener>();
+	public static Map<String, Map<Integer, SmtpEntry>> SmtpEntries = new ConcurrentHashMap<String, Map<Integer, SmtpEntry>>();
+	public static Map<String, Map<Integer, ImapEntry>> ImapEntries = new ConcurrentHashMap<String, Map<Integer, ImapEntry>>();
+	public static EventService eventService = new EventService();
 
 	public static synchronized String assignMessageId() {
 		if (++INCREMNT_NUMBER > 9999) {

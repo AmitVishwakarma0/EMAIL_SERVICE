@@ -38,10 +38,10 @@ public class DBService {
 
 	private Logger logger = LoggerFactory.getLogger(DBService.class);
 
-	public SmtpEntry getSmtpEntry(String systemId, int smtpId) {
+	public SmtpEntry loadSmtpEntry(String systemId, int smtpId) {
 		String sql = "SELECT * FROM smtp_config WHERE id = ? and system_id = ?";
 		try (Connection con = GlobalVar.connectionPool.getConnection();
-			PreparedStatement stmt = con.prepareStatement(sql)) {
+				PreparedStatement stmt = con.prepareStatement(sql)) {
 			stmt.setInt(1, smtpId);
 			stmt.setString(2, systemId);
 			ResultSet rs = stmt.executeQuery();
@@ -53,6 +53,7 @@ public class DBService {
 				entry.setEmailUser(rs.getString("email_user"));
 				entry.setEmailPassword(rs.getString("email_password"));
 				entry.setVerified(rs.getBoolean("verified"));
+				entry.setReadInbox(rs.getBoolean("read_inbox"));
 				entry.setWebhookUrl(rs.getString("web_hook_url"));
 				String enc = rs.getString("encryption_type");
 				entry.setEncryptionType(enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
@@ -66,6 +67,95 @@ public class DBService {
 		}
 
 		return null;
+	}
+
+	public ImapEntry loadImapEntry(String systemId, int smtpId) {
+		String sql = "SELECT * FROM smtp_config WHERE id = ? and system_id = ?";
+		ImapEntry entry = null;
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = con.prepareStatement(sql)) {
+			stmt.setInt(1, smtpId);
+			stmt.setString(2, systemId);
+			ResultSet rs = stmt.executeQuery();
+			if (rs.next()) {
+				String enc = rs.getString("imap_enc_type");
+				entry = new ImapEntry(rs.getInt("id"), rs.getString("system_id"), rs.getString("imap_host"),
+						rs.getInt("imap_port"), rs.getString("email_user"), rs.getString("email_password"),
+						enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
+								: SmtpEntry.EncryptionType.NONE);
+			}
+
+		} catch (SQLException e) {
+			logger.error("Error fetching Imap entry for id {}", smtpId, e);
+		}
+
+		return entry;
+	}
+
+	public List<SmtpEntry> loadSmtpEntries() {
+		List<SmtpEntry> list = new ArrayList<SmtpEntry>();
+		String sql = "SELECT * FROM smtp_config";
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = con.prepareStatement(sql)) {
+			ResultSet rs = stmt.executeQuery();
+			while (rs.next()) {
+				SmtpEntry entry = new SmtpEntry();
+				entry.setId(rs.getInt("id"));
+				entry.setSystemId(rs.getString("system_id"));
+				entry.setHost(rs.getString("host"));
+				entry.setPort(rs.getInt("port"));
+				entry.setEmailUser(rs.getString("email_user"));
+				entry.setEmailPassword(rs.getString("email_password"));
+				entry.setVerified(rs.getBoolean("verified"));
+				entry.setReadInbox(rs.getBoolean("read_inbox"));
+				entry.setWebhookUrl(rs.getString("web_hook_url"));
+				String enc = rs.getString("encryption_type");
+				entry.setEncryptionType(enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
+						: SmtpEntry.EncryptionType.NONE);
+
+				list.add(entry);
+			}
+
+		} catch (SQLException e) {
+			logger.error("Error fetching SMTP entries", e);
+		}
+
+		return list;
+	}
+
+	public List<ImapEntry> loadImapEntries() {
+		List<ImapEntry> list = new ArrayList<ImapEntry>();
+		String sql = "SELECT * FROM smtp_config WHERE read_inbox = ? and verified = ? and imap_host IS NOT NULL and imap_port > 0";
+		try (Connection con = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = con.prepareStatement(sql)) {
+			stmt.setBoolean(1, true);
+			stmt.setBoolean(2, true);
+			ResultSet rs = stmt.executeQuery();
+			while (rs.next()) {
+				String enc = rs.getString("imap_enc_type");
+				list.add(new ImapEntry(rs.getInt("id"), rs.getString("system_id"), rs.getString("imap_host"),
+						rs.getInt("imap_port"), rs.getString("email_user"), rs.getString("email_password"),
+						enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
+								: SmtpEntry.EncryptionType.NONE));
+			}
+		} catch (SQLException e) {
+			logger.error("Error fetching SMTP entries", e);
+		}
+
+		return list;
+	}
+
+	public void setSmtpVerified(int smtpId) {
+		String sql = "UPDATE smtp_config SET verified=? where id = ?";
+		try (Connection connection = GlobalVar.connectionPool.getConnection();
+				PreparedStatement stmt = connection.prepareStatement(sql)) {
+			stmt.setBoolean(1, true);
+			stmt.setInt(2, smtpId);
+			stmt.executeUpdate();
+			logger.info(smtpId + " smtp config updated as verified");
+		} catch (SQLException e) {
+			logger.error("Error updating smtp_config {}", smtpId, e);
+		}
 	}
 
 	public boolean createBatchEntry(EmailEntry entry) {
@@ -395,19 +485,6 @@ public class DBService {
 			logger.error("Unexpected error in {} Batches list", systemId, e);
 		}
 		return list;
-	}
-
-	public void updateSmtpStatus(int smtpId) {
-		String sql = "UPDATE smtp_config SET verified=? where id = ?";
-		try (Connection connection = GlobalVar.connectionPool.getConnection();
-				PreparedStatement stmt = connection.prepareStatement(sql)) {
-			stmt.setBoolean(1, true);
-			stmt.setInt(2, smtpId);
-			stmt.executeUpdate();
-			logger.info(smtpId + " smtp config updated as verified");
-		} catch (SQLException e) {
-			logger.error("Error updating smtp_config {}", smtpId, e);
-		}
 	}
 
 	public void addUserReportPartition() {
@@ -804,28 +881,6 @@ public class DBService {
 		} catch (SQLException e) {
 			logger.error("SQL error creating DB connection", e);
 		}
-	}
-
-	public List<ImapEntry> listImapEntries() {
-		List<ImapEntry> list = new ArrayList<ImapEntry>();
-		String sql = "SELECT * FROM smtp_config WHERE read_inbox = ? and verified = ? and imap_host IS NOT NULL and imap_port > 0";
-		try (Connection con = GlobalVar.connectionPool.getConnection();
-				PreparedStatement stmt = con.prepareStatement(sql)) {
-			stmt.setBoolean(1, true);
-			stmt.setBoolean(2, true);
-			ResultSet rs = stmt.executeQuery();
-			while (rs.next()) {
-				String enc = rs.getString("imap_enc_type");
-				list.add(new ImapEntry(rs.getInt("id"), rs.getString("system_id"), rs.getString("imap_host"),
-						rs.getInt("imap_port"), rs.getString("email_user"), rs.getString("email_password"),
-						enc != null ? SmtpEntry.EncryptionType.valueOf(enc.toUpperCase())
-								: SmtpEntry.EncryptionType.NONE));
-			}
-		} catch (SQLException e) {
-			logger.error("Error fetching SMTP entries", e);
-		}
-
-		return list;
 	}
 
 	public void addUserInboxPartition() {

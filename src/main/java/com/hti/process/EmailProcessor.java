@@ -82,7 +82,9 @@ public class EmailProcessor implements Runnable {
 	}
 
 	private void loadSmtpConfiguration() throws InvalidRequestException {
-		this.smtpEntry = service.getSmtpEntry(systemId, entry.getSmtpId());
+		if (GlobalVar.SmtpEntries.containsKey(systemId)) {
+			this.smtpEntry = GlobalVar.SmtpEntries.get(systemId).get(entry.getSmtpId());
+		}
 		if (smtpEntry == null) {
 			throw new InvalidRequestException("Smtp Configuration missing!!");
 		}

@@ -50,7 +50,7 @@ import lombok.Data;
  */
 public class ImapIdleListener implements Runnable {
 	private static final Logger logger = LoggerFactory.getLogger(ImapIdleListener.class);
-	private final ImapEntry smtpEntry;
+	private ImapEntry smtpEntry;
 	private volatile boolean running = true;
 	private final InboxService insertService; // existing service to enqueue inserts
 	private String keyName;
@@ -65,7 +65,7 @@ public class ImapIdleListener implements Runnable {
 
 	@Override
 	public void run() {
-		long backoffMillis = 1000;
+		long backoffMillis = 10000;
 		while (running) {
 			IMAPStore store = null;
 
@@ -74,6 +74,8 @@ public class ImapIdleListener implements Runnable {
 				props.put("mail.store.protocol", "imap");
 				props.put("mail.imap.connectiontimeout", "10000");
 				props.put("mail.imap.timeout", "10000");
+				props.put("mail.imap.auth", "true");
+				props.put("mail.debug", "true");
 
 				switch (smtpEntry.getEncryptionType()) {
 				case STARTTLS -> {
@@ -133,14 +135,11 @@ public class ImapIdleListener implements Runnable {
 					}
 				});
 
-				// Reset backoff
-				backoffMillis = 1000;
-
 				// IDLE loop — many servers allow indefinite IDLE; some require a periodic
 				// NOOP/refresh
 				while (running && store.isConnected()) {
 					try {
-						logger.debug(keyName + " entering IDLE");
+						logger.info(keyName + " entering IDLE");
 						inbox.idle(); // blocks until server notifies or timeout
 						// After idle returns, loop continues and listener handles messages
 					} catch (FolderClosedException fce) {
@@ -178,7 +177,6 @@ public class ImapIdleListener implements Runnable {
 				Thread.currentThread().interrupt();
 				break;
 			}
-			backoffMillis = Math.min(backoffMillis * 2, TimeUnit.MINUTES.toMillis(5)); // cap 5min
 		}
 
 		logger.info(keyName + " ImapIdleListener stopped.");
@@ -209,8 +207,9 @@ public class ImapIdleListener implements Runnable {
 
 				MimeMessage mime = (MimeMessage) m;
 				String messageId = mime.getMessageID();
-				logger.info(keyName + " Processing Email : " + messageId);
 				String from = mime.getFrom()[0].toString();
+				logger.info(keyName + " Processing Email : " + uid + " from: " + from);
+
 				String subject = mime.getSubject();
 				Date receivedDate = mime.getReceivedDate();
 
@@ -387,6 +386,11 @@ public class ImapIdleListener implements Runnable {
 			logger.error(keyName + " error fetching messages by UID", e);
 			return new Message[0];
 		}
+	}
+
+	public void updateEntry(ImapEntry imapEntry) {
+		this.smtpEntry = imapEntry;
+
 	}
 
 }

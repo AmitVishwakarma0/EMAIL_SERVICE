@@ -60,16 +60,7 @@ public class ServiceController implements Runnable {
 		loadConfiguration();
 		initializeGlobalVars();
 		FileUtil.setDefaultFlag(GlobalVar.FLAG_DIR + "//Application.flag");
-		ExecutorService exec = Executors.newSingleThreadExecutor();
-		exec.submit(() -> {
-			try {
-				loadPendingEntriesAsync();
-				startImapListeners();
-			} finally {
-				exec.shutdown();
-			}
-		});
-
+		GlobalVar.eventService.handleStart();
 		new Thread(this, "Monitor").start();
 	}
 
@@ -101,7 +92,7 @@ public class ServiceController implements Runnable {
 			ie.printStackTrace();
 		} finally {
 			logger.info("<-- Received Command To Stop Service --> ");
-			stopProcess();
+			GlobalVar.eventService.handleStop();
 		}
 		logger.info("<-- Exiting --> ");
 		System.exit(0);
@@ -170,92 +161,6 @@ public class ServiceController implements Runnable {
 		GlobalVar.SMTP_PORT = Integer.parseInt(props.getProperty("smtp.mail.port"));
 
 		logger.info("Configuration loaded successfully.");
-	}
-
-	private void loadPendingEntriesAsync() {
-		logger.info("Checking For PendingEntries");
-		DBService service = new DBService();
-		List<EmailEntry> list = service.listPendingEntries();
-
-		if (list.isEmpty()) {
-			logger.info("No Pending Batches Found");
-			return;
-		}
-		ExecutorService entryExecutor = Executors.newFixedThreadPool(list.size());
-		for (EmailEntry entry : list) {
-			entryExecutor.submit(() -> processEntry(entry));
-		}
-		entryExecutor.shutdown(); // Stop accepting new tasks
-
-		try {
-			// Wait until all tasks complete (up to 60 seconds)
-			if (!entryExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
-				entryExecutor.shutdownNow(); // Force shutdown if still running
-			}
-		} catch (InterruptedException e) {
-			entryExecutor.shutdownNow();
-			Thread.currentThread().interrupt();
-		}
-
-		logger.info("End Checking For PendingEntries");
-	}
-
-	private void processEntry(EmailEntry entry) {
-		try {
-			DBService service = new DBService();
-			List<RecipientsEntry> recipients = service.listPendingRecipients(entry.getSystemId(), entry.getBatchId());
-			entry.setPendingRecipientList(recipients);
-			EmailProcessor processor = new EmailProcessor(entry);
-			GlobalVar.processingMap.computeIfAbsent(entry.getSystemId(), k -> new ConcurrentHashMap<>())
-					.put(entry.getBatchId(), processor);
-
-		} catch (InvalidRequestException e) {
-			logger.error(entry.getSystemId() + "[" + entry.getBatchId() + "]", e.getMessage());
-		}
-	}
-
-	private void stopProcess() {
-		stopImapListeners();
-		stopRunningBatches();
-		SingletonService.clear();
-	}
-
-	private void stopImapListeners() {
-		logger.info("<--- Stopping Imap Listeners Services -->");
-		try {
-			GlobalVar.ImapListenerMap.forEach((k, v) -> {
-				v.stop();
-			});
-		} catch (Exception e) {
-			logger.error("", e);
-		}
-
-	}
-
-	private void startImapListeners() {
-		logger.info("Starting Imap Listeners");
-		List<ImapEntry> list = new DBService().listImapEntries();
-		if (list.isEmpty()) {
-			logger.info("No Imap Configuration Found.");
-		}
-		for (ImapEntry entry : list) {
-			String keyname = entry.getSystemId() + "_" + entry.getId();
-			GlobalVar.ImapListenerMap.put(keyname, new ImapIdleListener(entry));
-		}
-		logger.info("End Imap Listeners");
-	}
-
-	private void stopRunningBatches() {
-		GlobalVar.processingMap.forEach((systemId, batchMap) -> {
-			batchMap.forEach((batchId, processor) -> {
-				try {
-					processor.stop();
-				} catch (Exception ignored) {
-				}
-			});
-		});
-
-		GlobalVar.processingMap.clear();
 	}
 
 }

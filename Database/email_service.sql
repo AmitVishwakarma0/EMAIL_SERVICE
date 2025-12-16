@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS `smtp_config` (
   `encryption_type` enum('SSL','STARTTLS','NONE') NOT NULL,
   `email_user` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `email_password` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `auth_type` enum('PASSWORD','OAUTH2') NOT NULL DEFAULT 'PASSWORD',
   `verified` tinyint(1) NOT NULL DEFAULT (0),
   `read_inbox` tinyint(1) NOT NULL DEFAULT (0),
   `web_hook_url` varchar(100) DEFAULT NULL,
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `smtp_config` (
   `imap_port` int NOT NULL DEFAULT '0',
   `imap_enc_type` enum('SSL','STARTTLS','NONE') NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Data exporting was unselected.
 
